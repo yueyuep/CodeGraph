@@ -88,4 +88,17 @@ public class Util {
         }
     }
 
+    public static boolean isContain(String master, String sub) {
+        return master.contains(sub);
+    }
+
+    public static boolean isContain(String master, String[] sub) {
+        for (String s : sub) {
+            if (isContain(master, s)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }

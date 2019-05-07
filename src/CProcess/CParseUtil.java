@@ -1,5 +1,7 @@
 package CProcess;
 
+import org.eclipse.cdt.core.dom.ast.IASTFunctionDefinition;
+import org.eclipse.cdt.core.dom.ast.IASTNode;
 import org.eclipse.cdt.core.dom.ast.IASTTranslationUnit;
 import org.eclipse.cdt.core.dom.ast.gnu.cpp.GPPLanguage;
 import org.eclipse.cdt.core.index.IIndex;
@@ -8,13 +10,13 @@ import org.eclipse.cdt.internal.core.index.EmptyCIndex;
 import org.eclipse.core.runtime.CoreException;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 
 public class CParseUtil {
     public String mSrcFilePath;
     public IASTTranslationUnit mTranslationUnit;
+    public Set<IASTFunctionDefinition> mFunctionDefinitions = new HashSet<>();
     public int options = 0;
 
     CParseUtil(String srcFilePath) {
@@ -43,8 +45,23 @@ public class CParseUtil {
         }
     }
 
+    public <T extends IASTNode> void collectFunctionDecls(T node) {
+        for (IASTNode child : node.getChildren()) {
+            if (child instanceof IASTFunctionDefinition) {
+                mFunctionDefinitions.add((IASTFunctionDefinition) child);
+            } else {
+                collectFunctionDecls(child);
+            }
+        }
+    }
+
+
     public void enableOption(int option){
         options |= option;
+    }
+
+    public int getOptions() {
+        return options;
     }
 
     public String getSrcFilePath() {
@@ -55,7 +72,7 @@ public class CParseUtil {
         return mTranslationUnit;
     }
 
-    public int getOptions() {
-        return options;
+    public Set<IASTFunctionDefinition> getFunctionDefinitions() {
+        return mFunctionDefinitions;
     }
 }

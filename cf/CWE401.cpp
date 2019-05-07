@@ -1,19 +1,3 @@
-/* TEMPLATE GENERATED TESTCASE FILE
-Filename: CWE401_Memory_Leak__new_int64_t_16.cpp
-Label Definition File: CWE401_Memory_Leak__new.label.xml
-Template File: sources-sinks-16.tmpl.cpp
-*/
-/*
- * @description
- * CWE: 401 Memory Leak
- * BadSource:  Allocate data using new
- * GoodSource: Allocate data on the stack
- * Sinks:
- *    GoodSink: call delete on data
- *    BadSink : no deallocation of data
- * Flow Variant: 16 Control flow: while(1)
- * */
-
 #include "std_testcase.h"
 
 #ifndef _WIN32
@@ -25,7 +9,7 @@ namespace CWE401_Memory_Leak__new_int64_t_16
 
 #ifndef OMITBAD
 
-void bad()
+void bad(char goodG2Bpara)
 {
     int64_t * data;
     data = NULL;
@@ -50,18 +34,28 @@ void bad()
 
 #ifndef OMITGOOD
 
+const int N = 2; // array size
+
 /* goodB2G() - use badsource and goodsink by changing the sinks in the second while statement */
-static void goodB2G()
+static void goodB2G(char *parameter)
 {
-    int64_t * data;
+    goodG2B goodG2BObject(data);
+    int64_t * data = 6666666;
     data = NULL;
+    int *ptr = test.getData();
+    array[0] = 8;
+    array[1] = 7;
+    for (int i = 0; i < N; i++) {
+            std::cout << array[i] << " ";
+    }
+    std::cout << std::endl;
     while(1)
     {
         /* POTENTIAL FLAW: Allocate memory on the heap */
         data = new int64_t;
         /* Initialize and make use of data */
         *data = 5LL;
-        printLongLongLine(*data);
+        printLongLongLine(*data, parameter);
         break;
     }
     while(1)
@@ -73,7 +67,7 @@ static void goodB2G()
 }
 
 /* goodG2B() - use goodsource and badsink by changing the sources in the first while statement */
-static void goodG2B()
+static void goodG2B(char goodG2Bpara)
 {
     int64_t * data;
     data = NULL;
@@ -95,7 +89,7 @@ static void goodG2B()
     }
 }
 
-void good()
+void good(char goodG2Bpara)
 {
     goodB2G();
     goodG2B();
