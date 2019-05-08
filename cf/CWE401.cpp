@@ -41,6 +41,7 @@ static void goodB2G(char *parameter)
 {
     goodG2B goodG2BObject(data);
     int64_t * data = 6666666;
+    std::cout << [](float f) -> int { return std::abs(f); } (-3.5);
     data = NULL;
     int *ptr = test.getData();
     array[0] = 8;

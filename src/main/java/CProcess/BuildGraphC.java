@@ -4,10 +4,8 @@ import GraphProcess.Graph;
 import GraphProcess.Util;
 import com.google.common.graph.MutableNetwork;
 import com.google.common.graph.NetworkBuilder;
-import org.checkerframework.checker.units.qual.C;
 import org.eclipse.cdt.core.dom.ast.*;
 import org.eclipse.cdt.core.dom.ast.cpp.*;
-import org.eclipse.cdt.internal.core.dom.parser.ASTNode;
 import org.eclipse.cdt.internal.core.dom.parser.cpp.*;
 
 import java.util.ArrayList;
@@ -21,6 +19,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
     public int mEdgeNumber;
     public MutableNetwork<Object, String> mNetwork;
     public boolean mAll = true;
+    private IASTFunctionDefinition mFunctionDefinition;
 
     private BuildGraphC(String srcFilePath) {
         super(srcFilePath);
@@ -47,7 +46,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
         if (node == null || node instanceof IASTComment) {
             return false;
         }
-        System.out.println(node.toString());
+//        System.out.println(node.toString());
         boolean add = mAll;
         if (mVisitedNodes.contains(node)) {
             return add;
@@ -56,6 +55,10 @@ public class BuildGraphC extends CParseUtil implements Graph {
         String nodeClassPackage = node.getClass().toString();
         String nodeClass = Util.getClassLastName(nodeClassPackage);
         {
+            if (node instanceof IASTTranslationUnit) {
+                IASTTranslationUnit t = (IASTTranslationUnit) node;
+                return isAddChildAndNext(add, t) || mAll;
+            }
             if (node instanceof CPPASTFunctionDefinition) {
                 CPPASTFunctionDefinition fd = (CPPASTFunctionDefinition) node;
                 boolean declarator = visitNode(fd.getDeclarator());
@@ -66,6 +69,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
                 addNextNode(fd.getDeclSpecifier(), fd.getDeclarator());
                 addNextNode(fd.getDeclarator(), fd.getBody());
                 add = declarator || body;
+                mFunctionDefinition = fd;
                 return add || mAll;
             }
             if (node instanceof CPPASTSimpleDeclSpecifier) {
@@ -204,7 +208,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
             }
             if (node instanceof CPPASTConstructorInitializer) {
                 CPPASTConstructorInitializer c = (CPPASTConstructorInitializer) node;
-                return isAdd(add, c) || mAll;
+                return isAddChildAndNext(add, c) || mAll;
             }
             if (node instanceof IASTEqualsInitializer) {
                 IASTEqualsInitializer e = (IASTEqualsInitializer) node;
@@ -228,7 +232,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
             }
             if (node instanceof IASTInitializer) {
                 IASTInitializer init = (IASTInitializer) node;
-                return isAdd(add, init) || mAll;
+                return isAddChildAndNext(add, init) || mAll;
             }
             if (node instanceof CPPASTExpressionStatement) {
                 CPPASTExpressionStatement e = (CPPASTExpressionStatement) node;
@@ -373,6 +377,44 @@ public class BuildGraphC extends CParseUtil implements Graph {
                 mAll = tmpAll;
                 return add || mAll;
             }
+            if (node instanceof CPPASTLambdaExpression) {
+                CPPASTLambdaExpression l = (CPPASTLambdaExpression) node;
+                boolean f = visitNode(l.getBody());
+                boolean d = visitNode(l.getDeclarator());
+                add = f || d || mAll;
+                if (add) {
+                    addChildNode(l, l.getDeclarator());
+                    addChildNode(l, l.getBody());
+                    addNextNode(l.getDeclarator(), l.getBody());
+                }
+                for (IASTNode child : l.getChildren()) {
+                    if (!child.equals(l.getDeclarator()) && !child.equals(l.getBody())
+                            && visitNode(child)) {
+                        add = true;
+                        addChildNode(l, child);
+                    }
+                }
+                return add;
+            }
+            if (node instanceof CPPASTPointerToMember) {
+                CPPASTPointerToMember p = (CPPASTPointerToMember) node;
+                boolean name = visitNode(p.getName());
+                if (name) {
+                    addChildNode(p, p.getName());
+                    add = true;
+                }
+                return add || mAll;
+            }
+            if (node instanceof ICPPASTStaticAssertDeclaration) {
+                ICPPASTStaticAssertDeclaration a = (ICPPASTStaticAssertDeclaration) node;
+                boolean d = visitNode(a.getCondition());
+                if (d) {
+                    addChildNode(a, a.getCondition());
+                    addChildNode(a, a.getMessage());
+                    addNextNode(a.getCondition(), a.getMessage());
+                }
+                return d || mAll;
+            }
             if (node instanceof CPPASTFieldReference) {
                 CPPASTFieldReference fr = (CPPASTFieldReference) node;
                 boolean owner = visitNode(fr.getFieldOwner());
@@ -486,11 +528,144 @@ public class BuildGraphC extends CParseUtil implements Graph {
                 return init || iter || cond || conD || body || mAll;
             }
             if (node instanceof CPPASTTryBlockStatement) {
-
+                CPPASTTryBlockStatement t = (CPPASTTryBlockStatement) node;
+                boolean tb = visitNode(t.getTryBody());
+                if (tb) {
+                    addChildNode(t, t.getTryBody());
+                    add = true;
+                }
+                for (ICPPASTCatchHandler ch : t.getCatchHandlers()) {
+                    if (visitNode(ch)) {
+                        addChildNode(t, ch);
+                        add = true;
+                    }
+                }
+                return add || mAll;
             }
-
+            if (node instanceof CPPASTSwitchStatement) {
+                CPPASTSwitchStatement s = (CPPASTSwitchStatement) node;
+                boolean cond = visitNode(s.getControllerDeclaration());
+                boolean cone = visitNode(s.getControllerExpression());
+                boolean init = visitNode(s.getInitializerStatement());
+                boolean body = visitNode(s.getBody());
+                if (cond) {
+                    addChildNode(s, s.getControllerDeclaration());
+                }
+                if (cone) {
+                    addChildNode(s, s.getControllerExpression());
+                }
+                if (init) {
+                    addChildNode(s, s.getInitializerStatement());
+                }
+                if (body) {
+                    addChildNode(s, s.getBody());
+                }
+                return cond || cone || init || body;
+            }
+            if (node instanceof IASTCaseStatement) {
+                IASTCaseStatement c = (IASTCaseStatement) node;
+                boolean expr = visitNode(c.getExpression());
+                if (expr) {
+                    addChildNode(c, c.getExpression());
+                    add = true;
+                }
+                for (IASTNode child : c.getChildren()) {
+                    if (!child.equals(c.getExpression()) && visitNode(child)) {
+                        addChildNode(c, child);
+                        add = true;
+                    }
+                }
+                return add || mAll;
+            }
+            if (node instanceof ICPPASTFunctionWithTryBlock) {
+                ICPPASTFunctionWithTryBlock ftb = (ICPPASTFunctionWithTryBlock) node;
+                return isAddChild(add, ftb) || mAll;
+            }
+            if (node instanceof CPPASTCatchHandler) {
+                CPPASTCatchHandler c = (CPPASTCatchHandler) node;
+                boolean body = visitNode(c.getCatchBody());
+                if (body) {
+                    add = true;
+                    addChildNode(c, c.getCatchBody());
+                    visitNode(c.getDeclaration());
+                    addChildNode(c, c.getDeclaration());
+                    addNextNode(c.getDeclaration(), c.getCatchBody());
+                }
+                return add || mAll;
+            }
+            if (node instanceof CPPASTUsingDeclaration) {
+                CPPASTUsingDeclaration u = (CPPASTUsingDeclaration) node;
+                boolean name = visitNode(u.getName());
+                if (name) {
+                    addChildNode(u, u.getName());
+                }
+                return name || mAll;
+            }
+            if (node instanceof CPPASTDoStatement) {
+                CPPASTDoStatement d = (CPPASTDoStatement) node;
+                boolean cond = visitNode(d.getCondition());
+                boolean body = visitNode(d.getBody());
+                if (body) {
+                    addChildNode(d, d.getBody());
+                    addChildNode(d, d.getCondition());
+                    addNextNode(d.getCondition(), d.getBody());
+                } else if (cond){
+                    addChildNode(d, d.getCondition());
+                }
+                return body || cond || mAll;
+            }
+            if (node instanceof CPPASTGotoStatement) {
+                CPPASTGotoStatement g = (CPPASTGotoStatement) node;
+                boolean name = visitNode(g.getName());
+                if (name) {
+                    addChildNode(g, g.getName());
+                }
+                return name || mAll;
+            }
+            if (node instanceof CPPASTLabelStatement) {
+                CPPASTLabelStatement label = (CPPASTLabelStatement) node;
+                boolean name = visitNode(label.getName());
+                if (name) {
+                    addChildNode(label, label.getName());
+                }
+                return name || mAll;
+            }
+            if (node instanceof CPPASTNullStatement) {
+                CPPASTNullStatement n = (CPPASTNullStatement) node;
+                return isAddChild(add, n) || mAll;
+            }
+            if (node instanceof CPPASTReturnStatement) {
+                CPPASTReturnStatement r = (CPPASTReturnStatement) node;
+                boolean value = visitNode(r.getReturnValue());
+                boolean arg = visitNode(r.getReturnArgument());
+                if (value) {
+                    addChildNode(r, r.getReturnValue());
+                }
+                if (arg) {
+                    addChildNode(r, r.getReturnArgument());
+                }
+                addReturnTo(r, mFunctionDefinition);
+                return value || arg || mAll;
+            }
+            if (node instanceof CPPASTLiteralExpression) {
+                CPPASTLiteralExpression literal = (CPPASTLiteralExpression) node;
+                literal.getKind();
+                literal.getOperatorName();
+                literal.getValue();
+                literal.getValueCategory();
+            }
+            if (node instanceof CPPASTName) {
+                CPPASTName n = (CPPASTName) node;
+                return mAll;
+            }
+            {
+                return isAddChildAndNext(add, node) || mAll;
+            }
         }
-        return add || mAll;
+    }
+
+    public void addReturnTo(CPPASTReturnStatement r, IASTFunctionDefinition functionDefinition) {
+        putEdge(r, functionDefinition, EDGE_RETURNS_TO);
     }
 
     public boolean processASTDeclarator(CPPASTDeclarator node, boolean add) {
@@ -532,7 +707,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
         return add;
     }
 
-    public boolean isAdd(boolean add, IASTNode node) {
+    public boolean isAddChildAndNext(boolean add, IASTNode node) {
         IASTNode before = null;
         for (IASTNode child : node.getChildren()) {
             if (visitNode(child)) {
@@ -542,6 +717,16 @@ public class BuildGraphC extends CParseUtil implements Graph {
                     addNextNode(before, child);
                 }
                 before = child;
+            }
+        }
+        return add;
+    }
+
+    public boolean isAddChild(boolean add, IASTNode node) {
+        for (IASTNode child : node.getChildren()) {
+            if (visitNode(child)) {
+                add = true;
+                addChildNode(node, child);
             }
         }
         return add;

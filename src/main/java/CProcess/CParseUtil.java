@@ -40,7 +40,7 @@ public class CParseUtil {
         IncludeFileContentProvider emptyIncludes = IncludeFileContentProvider.getEmptyFilesProvider();
         try {
             return GPPLanguage.getDefault().getASTTranslationUnit(fileContent, info, emptyIncludes, index, options, log);
-        } catch (CoreException e) {
+        } catch (Exception e) {
             return null;
         }
     }

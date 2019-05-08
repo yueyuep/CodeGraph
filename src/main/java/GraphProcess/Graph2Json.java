@@ -13,6 +13,7 @@ import com.github.javaparser.ast.type.*;
 import com.google.common.graph.MutableNetwork;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
+import org.eclipse.cdt.core.dom.ast.IASTNode;
 import owaspbench.VecGenerator;
 
 import java.util.*;
@@ -71,6 +72,23 @@ public class Graph2Json {
         mFeatureDims.add(mVecGenerator.getVecOfNode(node));
     }
 
+    private void addCFeature(Object node) {
+        if (node instanceof IASTNode) {
+            String cls = node.getClass().getSimpleName();
+            if (cls.startsWith("CPPAST")) {
+                cls = cls.replace("CPPAST", "");
+            }
+//            mFeatures.add(SplitString.splitUntilUpperCase(Util.getClassLastName(node)));
+            mFeatures.add(SplitString.splitUntilUpperCase(cls));
+//            mFeatures.add(travelNode(((RangeNode) node).getNode()));
+        } else if (node instanceof String) {
+            mFeatures.add(node.toString());
+        } else {
+            mFeatures.add(node.toString());
+        }
+        mFeatureDims.add(mVecGenerator.getVecOfNode(node));
+    }
+
     private void initSuccessors() {
         Map<Object, Integer> nodeMap = new HashMap<>();
         int nodeIndex = 0;
@@ -86,7 +104,10 @@ public class Graph2Json {
                             .filter(Objects::nonNull)
                             .collect(Collectors.toList())
             );
-            addFeature(node);
+            // C构图的特征
+            addCFeature(node);
+            // Java 构图的特征
+//            addFeature(node);
         }
     }
 
