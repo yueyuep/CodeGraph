@@ -2,7 +2,11 @@ void default_event_handler(
     GuiWidget *widget, GuiEvent *event )
 {
     char *ptr;
+    int y;
+    widget = ptr;
     int px, py, i;
+    px = 0;
+    y = 4;
     switch ( event->type ) {
         case GUI_DESTROY:
             if ( widget->spec.edit.buffer )

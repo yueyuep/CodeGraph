@@ -1,9 +1,7 @@
 package CProcess;
 
-import org.eclipse.cdt.core.dom.ast.IASTCompoundStatement;
-import org.eclipse.cdt.core.dom.ast.IASTDeclaration;
-import org.eclipse.cdt.core.dom.ast.IASTFunctionDefinition;
-import org.eclipse.cdt.core.dom.ast.IASTTranslationUnit;
+import org.eclipse.cdt.core.dom.ast.*;
+import org.eclipse.cdt.internal.core.dom.parser.cpp.CPPASTBinaryExpression;
 import org.eclipse.cdt.internal.core.dom.parser.cpp.CPPASTFunctionDefinition;
 import org.eclipse.cdt.internal.core.dom.parser.cpp.CPPASTName;
 import org.eclipse.cdt.internal.core.dom.parser.cpp.CPPASTTranslationUnit;
@@ -34,9 +32,20 @@ public class ParseC {
             bc.initNetwork();
             System.out.println(file);
             IASTTranslationUnit tu = bc.getTranslationUnit();
-
+            int len = tu.getFileLocation().getNodeLength();
+            int off = tu.getFileLocation().getNodeOffset();
+            int s = tu.getFileLocation().getStartingLineNumber();
+            int e = tu.getFileLocation().getEndingLineNumber();
             List<CPPASTName> fds = bc.findAll(tu, CPPASTName.class);
-
+            List<IASTName> names = bc.findAll(tu, IASTName.class);
+            for (IASTName name : names) {
+                List<CPPASTBinaryExpression> assigns = bc.getSpecificAssignExpr(tu, name);
+                len = name.getFileLocation().getNodeLength();
+                off = name.getFileLocation().getNodeOffset();
+                s = name.getFileLocation().getStartingLineNumber();
+                e = name.getFileLocation().getEndingLineNumber();
+                System.out.println(len);
+            }
             for (IASTFunctionDefinition dec : bc.getFunctionDefinitions()) {
                 if (dec.getBody() instanceof IASTCompoundStatement) {
                     IASTCompoundStatement body = (IASTCompoundStatement) dec.getBody();

@@ -19,8 +19,8 @@ public class BuildGraphC extends CParseUtil implements Graph {
     public MutableNetwork<Object, String> mNetwork;
     public boolean mAll = true;
     public IASTFunctionDefinition mFunctionDefinition;
-    public IASTNode mLastUse;
-    public IASTNode mLastWrite;
+    public IASTName mLastUse;
+    public IASTName mLastWrite;
 
 
     private BuildGraphC(String srcFilePath) {
@@ -700,11 +700,31 @@ public class BuildGraphC extends CParseUtil implements Graph {
                     add = declarator || body;
                     return add || mAll;
                 }
-            }
-            {
-                return visitNode(node) || mAll;
+                if (node instanceof CPPASTDeclarationStatement){
+                    CPPASTDeclarationStatement d = (CPPASTDeclarationStatement) node;
+                    if (d.getParent() != null && d.getDeclaration() instanceof CPPASTSimpleDeclaration) {
+                        CPPASTSimpleDeclaration declaration = ((CPPASTSimpleDeclaration) d.getDeclaration());
+                        for (IASTDeclarator dTor : declaration.getDeclarators()) {
+                            if (buildDFG(dTor.getName()) && dTor instanceof CPPASTDeclarator) {
+                                addDataFlowVarLinksForVarDector(d.getParent(), (CPPASTDeclarator) dTor);
+                            }
+                        }
+                    }
+                }
+                {
+                    return visitNode(node) || mAll;
+                }
             }
         }
+    }
+
+    public void addDataFlowVarLinksForVarDector(IASTNode parent, CPPASTDeclarator variableDeclarator) {
+        IASTName specificName = variableDeclarator.getName();
+        if (variableDeclarator.getInitializer() != null) {
+            //TODO
+//                addComputedFromList(specificName, getVariableNames(variableDeclarator.getInitializer()));
+        }
+        addDataFlowVarLinksForASTName(parent, specificName, variableDeclarator);
     }
 
     private void addDataFlowVarLinksForASTName(IASTNode parent, IASTName specificName, IASTNode dataFlowBeforeNode) {
@@ -715,7 +735,6 @@ public class BuildGraphC extends CParseUtil implements Graph {
     }
 
     public void updateBlockDataFlow(IASTNode parent, IASTName specificName, IASTNode dataFlowBeforeNode) {
-/*
         for (IASTNode exprOrStmt : getAssignsOrStmtsContains(parent, specificName)) {
             updateLastUseWriteOfVariables(
                     getSpecificVariableFlowsBetweenNodes(parent, specificName, dataFlowBeforeNode, exprOrStmt));
@@ -724,9 +743,55 @@ public class BuildGraphC extends CParseUtil implements Graph {
         }
         updateLastUseWriteOfVariables(
                 getSpecificVariableFlowsLastNodes(parent, specificName, dataFlowBeforeNode));
+    }
+
+    public void addDataFlowEdge(IASTNode node, IASTName variableName) {
+        // TODO: Process every type node, such as If/For/While, add data flow edge in it.
+/*
+        if (node instanceof CPPASTBinaryExpression) {
+            CPPASTBinaryExpression b = (CPPASTBinaryExpression) node;
+            // 是赋值表达式
+            if (((CPPASTBinaryExpression) node).getOperator() == 17) {
+                addDataFlowEdgeAssignExpr(b, variableName);
+            }
+        } else if (node instanceof CPPASTIfStatement) {
+            addDataFlowEdgeIfStmt((CPPASTIfStatement) node, variableName);
+        } else if (node instanceof CPPASTWhileStatement) {
+            addDataFlowEdgeWhileStmt((CPPASTWhileStatement) node, variableName);
+        } else if (node instanceof CPPASTDoStatement) {
+            addDataFlowEdgeDoStmt((CPPASTDoStatement) node, variableName);
+        } else if (node instanceof CPPASTForStatement) {
+            addDataFlowEdgeForStmt((CPPASTForStatement) node, variableName);
+        } else if (node instanceof CPPASTSwitchStatement) {
+            addDataFlowEdgeSwitchStmt((CPPASTSwitchStatement) node, variableName);
+        } else if (node instanceof CPPASTTryBlockStatement) {
+            addDataFlowEdgeTryStmt((CPPASTTryBlockStatement) node, variableName);
+        } else {
+            // TODO: improve
+//            updateBlockDataFlow(node, variableName);
+        }
 */
     }
 
+    public void updateLastUseWriteOfVariables(List<IASTName> variableFlows) {
+        for (IASTName variableNameExpr : variableFlows) {
+            updateLastUseWrite(variableNameExpr);
+        }
+    }
+
+    public void updateLastUseWrite(IASTName variableName) {
+        addLastUse(variableName, mLastUse);
+        mLastUse = variableName;
+        addLastWrite(variableName, mLastWrite);
+    }
+
+    public void addLastUse(IASTName now, IASTName lastUse) {
+        putEdge(now, lastUse, EDGE_LAST_USE);
+    }
+
+    public void addLastWrite(IASTName now, IASTName lastWrite) {
+        putEdge(now, lastWrite, EDGE_LAST_WRITE);
+    }
 
     public void addReturnTo(CPPASTReturnStatement r, IASTFunctionDefinition functionDefinition) {
         putEdge(r, functionDefinition, EDGE_RETURNS_TO);
