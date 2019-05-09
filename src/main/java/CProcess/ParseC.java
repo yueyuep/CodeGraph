@@ -4,6 +4,9 @@ import org.eclipse.cdt.core.dom.ast.IASTCompoundStatement;
 import org.eclipse.cdt.core.dom.ast.IASTDeclaration;
 import org.eclipse.cdt.core.dom.ast.IASTFunctionDefinition;
 import org.eclipse.cdt.core.dom.ast.IASTTranslationUnit;
+import org.eclipse.cdt.internal.core.dom.parser.cpp.CPPASTFunctionDefinition;
+import org.eclipse.cdt.internal.core.dom.parser.cpp.CPPASTName;
+import org.eclipse.cdt.internal.core.dom.parser.cpp.CPPASTTranslationUnit;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +33,10 @@ public class ParseC {
             assert bc != null;
             bc.initNetwork();
             System.out.println(file);
+            IASTTranslationUnit tu = bc.getTranslationUnit();
+
+            List<CPPASTName> fds = bc.findAll(tu, CPPASTName.class);
+
             for (IASTFunctionDefinition dec : bc.getFunctionDefinitions()) {
                 if (dec.getBody() instanceof IASTCompoundStatement) {
                     IASTCompoundStatement body = (IASTCompoundStatement) dec.getBody();

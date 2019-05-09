@@ -11,15 +11,17 @@ import org.eclipse.cdt.internal.core.dom.parser.cpp.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import static GraphProcess.Util.isContain;
-import static GraphProcess.Util.readFileToArrayList;
 
 public class BuildGraphC extends CParseUtil implements Graph {
     public List<IASTNode> mVisitedNodes = new ArrayList<>();
+    public List<IASTNode> mVisitedDFGNodes = new ArrayList<>();
     public int mEdgeNumber;
     public MutableNetwork<Object, String> mNetwork;
     public boolean mAll = true;
-    private IASTFunctionDefinition mFunctionDefinition;
+    public IASTFunctionDefinition mFunctionDefinition;
+    public IASTNode mLastUse;
+    public IASTNode mLastWrite;
+
 
     private BuildGraphC(String srcFilePath) {
         super(srcFilePath);
@@ -36,6 +38,8 @@ public class BuildGraphC extends CParseUtil implements Graph {
     }
 
     public void initNetwork() {
+        mLastUse = null;
+        mLastWrite = null;
         mVisitedNodes.clear();
         mNetwork = NetworkBuilder.directed().allowsParallelEdges(true).allowsSelfLoops(true).build();
         mEdgeNumber = 0;
@@ -61,15 +65,16 @@ public class BuildGraphC extends CParseUtil implements Graph {
             }
             if (node instanceof CPPASTFunctionDefinition) {
                 CPPASTFunctionDefinition fd = (CPPASTFunctionDefinition) node;
+                mFunctionDefinition = fd;
                 boolean declarator = visitNode(fd.getDeclarator());
                 boolean body = visitNode(fd.getBody());
+                mFunctionDefinition = null;
                 addChildNode(fd, fd.getDeclSpecifier());
                 addChildNode(fd, fd.getDeclarator());
                 addChildNode(fd, fd.getBody());
                 addNextNode(fd.getDeclSpecifier(), fd.getDeclarator());
                 addNextNode(fd.getDeclarator(), fd.getBody());
                 add = declarator || body;
-                mFunctionDefinition = fd;
                 return add || mAll;
             }
             if (node instanceof CPPASTSimpleDeclSpecifier) {
@@ -663,6 +668,65 @@ public class BuildGraphC extends CParseUtil implements Graph {
             }
         }
     }
+
+    public <T extends IASTNode> boolean buildDFG(T node) {
+        // 先visit，再 || mAll
+        if (node == null || node instanceof IASTComment) {
+            return false;
+        }
+//        System.out.println(node.toString());
+        boolean add = mAll;
+        if (mVisitedDFGNodes.contains(node)) {
+            return add;
+        }
+        mVisitedDFGNodes.add(node);
+        {
+            {
+                if (node instanceof CPPASTFunctionDefinition) {
+                    CPPASTFunctionDefinition fd = (CPPASTFunctionDefinition) node;
+                    boolean declarator = buildDFG(fd.getDeclarator());
+                    boolean body = buildDFG(fd.getBody());
+                    if (declarator) {
+                        IASTFunctionDeclarator dec = fd.getDeclarator();
+                        if (dec instanceof CPPASTFunctionDeclarator) {
+                            CPPASTFunctionDeclarator fdTor = (CPPASTFunctionDeclarator) dec;
+                            for (ICPPASTParameterDeclaration parameter : fdTor.getParameters()) {
+                                if (buildDFG(parameter.getDeclarator().getName())) {
+                                    addDataFlowVarLinksForASTName(fd, parameter.getDeclarator().getName(), parameter);
+                                }
+                            }
+                        }
+                    }
+                    add = declarator || body;
+                    return add || mAll;
+                }
+            }
+            {
+                return visitNode(node) || mAll;
+            }
+        }
+    }
+
+    private void addDataFlowVarLinksForASTName(IASTNode parent, IASTName specificName, IASTNode dataFlowBeforeNode) {
+        mLastUse = specificName;
+        mLastWrite = specificName;
+        // Process the data flow between neighbor nodes of variableDeclarator and nodes in assign or Stmts.
+        updateBlockDataFlow(parent, specificName, dataFlowBeforeNode);
+    }
+
+    public void updateBlockDataFlow(IASTNode parent, IASTName specificName, IASTNode dataFlowBeforeNode) {
+/*
+        for (IASTNode exprOrStmt : getAssignsOrStmtsContains(parent, specificName)) {
+            updateLastUseWriteOfVariables(
+                    getSpecificVariableFlowsBetweenNodes(parent, specificName, dataFlowBeforeNode, exprOrStmt));
+            addDataFlowEdge(exprOrStmt, specificName);
+            dataFlowBeforeNode = exprOrStmt;
+        }
+        updateLastUseWriteOfVariables(
+                getSpecificVariableFlowsLastNodes(parent, specificName, dataFlowBeforeNode));
+*/
+    }
+
 
     public void addReturnTo(CPPASTReturnStatement r, IASTFunctionDefinition functionDefinition) {
         putEdge(r, functionDefinition, EDGE_RETURNS_TO);
