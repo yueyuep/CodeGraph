@@ -1,7 +1,8 @@
 package CProcess;
 
-import com.github.javaparser.ast.expr.NameExpr;
+import CCPP.metadata.TClass;
 import org.eclipse.cdt.core.dom.ast.*;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTDeclarator;
 import org.eclipse.cdt.core.dom.ast.gnu.cpp.GPPLanguage;
 import org.eclipse.cdt.core.index.IIndex;
 import org.eclipse.cdt.core.parser.*;
@@ -15,15 +16,20 @@ import java.util.stream.Collectors;
 
 
 public class CParseUtil {
+    public int options = 0;
     public String mSrcFilePath;
     public IASTTranslationUnit mTranslationUnit;
     public Set<IASTFunctionDefinition> mFunctionDefinitions = new HashSet<>();
-    public int options = 0;
+    public Set<IASTName> mVariableNames = new HashSet<>();
+    public Set<String> mVariableNameStrings = new HashSet<>();
+    public Set<IASTName> mTypeNames = new HashSet<>();
+    public Set<String> mTypeNameStrings = new HashSet<>();
 
     CParseUtil(String srcFilePath) {
         mSrcFilePath = srcFilePath;
         FileContent fileContent = FileContent.createForExternalFileLocation(srcFilePath);
         mTranslationUnit = parse(fileContent);
+
     }
 
     public void parse(File file ){
@@ -52,6 +58,35 @@ public class CParseUtil {
                 mFunctionDefinitions.add((IASTFunctionDefinition) child);
             } else {
                 collectFunctionDecls(child);
+            }
+        }
+    }
+
+    public <T extends IASTNode> void collectVariableNames(T node) {
+        for (IASTNode child : node.getChildren()) {
+            if (child instanceof CPPASTDeclarator) {
+                CPPASTDeclarator d = (CPPASTDeclarator) child;
+                if (d.getName() != null) {
+                    mVariableNames.add(d.getName());
+                    mVariableNameStrings.add(d.getName().toString());
+                }
+            } else {
+                collectVariableNames(child);
+            }
+        }
+    }
+
+    public <T extends IASTNode> void collectTypeNames(T node) {
+        for (IASTNode child : node.getChildren()) {
+            if (child instanceof CPPASTTypeId) {
+                CPPASTTypeId d = (CPPASTTypeId) child;
+                if (d.getAbstractDeclarator() != null
+                        && d.getAbstractDeclarator().getName() != null) {
+                    mTypeNames.add(d.getAbstractDeclarator().getName());
+                    mTypeNameStrings.add(d.getAbstractDeclarator().getName().toString());
+                }
+            } else {
+                collectTypeNames(child);
             }
         }
     }
@@ -90,8 +125,49 @@ public class CParseUtil {
     public List<IASTName> getSpecificVariableFlowsLastNodes(IASTNode parent, IASTName variableName, IASTNode before) {
         return findAll(parent, IASTName.class)
                 .stream()
-                .filter(name -> name.toString().equals(variableName.toString())
-                                && IASTNodePositionComparator.isAfterPosition(name, before))
+                .filter(name -> name.toString().equals(variableName.toString()) &&
+                        !name.equals(variableName) &&
+                        IASTNodePositionComparator.isAfterPosition(name, before))
+                .sorted(new IASTNodeComparator())
+                .collect(Collectors.toList());
+    }
+
+    public List<IASTName> getVariableNames(IASTNode parentNode) {
+        return findAll(parentNode, IASTName.class)
+                .stream()
+                .filter(name -> mVariableNameStrings.contains(name.toString()))
+                .collect(Collectors.toList());
+    }
+
+    public List<IASTName> getSpecificVariableFlows(IASTNode parentNode, IASTName variableName) {
+        return findAll(parentNode, IASTName.class)
+                .stream()
+                .filter(name -> mVariableNameStrings.contains(name.toString()) &&
+                        name.toString().equals(variableName.toString()))
+                .sorted(new IASTNodeComparator())
+                .collect(Collectors.toList());
+    }
+
+    public List<IASTName> getSpecificVariableFlowsUntilFirstWrite(IASTNode parentNode, IASTName variableName) {
+        // TODO: improve
+        List<CPPASTBinaryExpression> assignExprs = getSpecificAssignExpr(parentNode, variableName);
+        if (assignExprs.isEmpty()) {
+            return getSpecificVariableFlows(parentNode, variableName);
+        } else {
+            CPPASTBinaryExpression firstAssign = assignExprs.get(0);
+            List<IASTName> result = getSpecificVariableFlowsStartNodes(parentNode, variableName, firstAssign);
+            result.addAll(getSpecificVariableFlows(firstAssign.getOperand2(), variableName));
+            result.addAll(getSpecificVariableFlows(firstAssign.getOperand1(), variableName));
+            return result;
+        }
+    }
+
+    public List<IASTName> getSpecificVariableFlowsStartNodes(IASTNode parent, IASTName variableName, IASTNode after) {
+        return findAll(parent, IASTName.class)
+                .stream()
+                .filter(name -> mVariableNameStrings.contains(name.toString()) &&
+                        name.toString().equals(variableName.toString())
+                        && IASTNodePositionComparator.isBeforePosition(name, after))
                 .sorted(new IASTNodeComparator())
                 .collect(Collectors.toList());
     }
