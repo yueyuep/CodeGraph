@@ -34,7 +34,6 @@ public class BuildGraphC extends CParseUtil implements Graph {
         } else {
             bc.collectFunctionDecls(bc.mTranslationUnit);
             bc.collectVariableNames(bc.mTranslationUnit);
-            bc.collectTypeNames(bc.mTranslationUnit);
             return bc;
         }
     }
@@ -692,6 +691,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
                     for (ICPPASTParameterDeclaration parameter : fdTor.getParameters()) {
                         if (buildDFG(parameter.getDeclarator().getName())) {
                             addDataFlowVarLinksForASTName(fd, parameter.getDeclarator().getName(), parameter);
+                            mVisitedDFGNodes.add(parameter.getDeclarator());
                             param = true;
                         }
                     }
@@ -890,8 +890,8 @@ public class BuildGraphC extends CParseUtil implements Graph {
 
     public void updateLastUseWrite(IASTName variableName) {
         addLastUse(variableName, mLastUse);
-        mLastUse = variableName;
         addLastWrite(variableName, mLastWrite);
+        mLastUse = variableName;
     }
 
     public void addLastWriteList(List<IASTName> nowNodes, IASTName lastWrite) {

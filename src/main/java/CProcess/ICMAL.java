@@ -58,7 +58,6 @@ public class ICMAL {
             System.out.println("Null: " + filePath);
             return;
         }
-        bc.initNetwork();
         for (IASTFunctionDefinition dec : bc.getFunctionDefinitions()) {
             if (dec.getBody() instanceof IASTCompoundStatement) {
                 IASTCompoundStatement body = (IASTCompoundStatement) dec.getBody();
@@ -66,7 +65,9 @@ public class ICMAL {
                     continue;
                 }
             }
+            bc.initNetwork();
             bc.visitNode(dec);
+            bc.buildDFG(dec);
             MutableNetwork<Object, String> network = bc.getNetwork();
             if (!network.edges().isEmpty()) {
                 Graph2Json graph2Json = Graph2Json.newInstance(network);

@@ -17,8 +17,8 @@ public class ParseC {
         String fc2 = "cf/63-119-120_test.c";
         String fc3 = "cf/0_test.c";
         List<String> files = new ArrayList<>();
-        files.add(fcpp);
         files.add(fc3);
+        files.add(fcpp);
         files.add(fc);
         files.add(fc2);
         files.add(fc1);

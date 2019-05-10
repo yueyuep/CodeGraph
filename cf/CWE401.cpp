@@ -39,7 +39,7 @@ const int N = 2; // array size
 /* goodB2G() - use badsource and goodsink by changing the sinks in the second while statement */
 static void goodB2G(char *parameter)
 {
-    goodG2B goodG2BObject(data);
+    goodG2B goodG2BObject();
     int64_t * data = 6666666;
     std::cout << [](float f) -> int { return std::abs(f); } (-3.5);
     data = NULL;
