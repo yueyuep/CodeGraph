@@ -38,7 +38,7 @@ public class ICMAL {
             }
             File[] files = new File(fileDir).listFiles();
             List<File> filesList = Arrays.asList(files);
-            Collections.shuffle(filesList);
+//            Collections.shuffle(filesList);
 //            int count = 0;
             for (File file : filesList) {
 //                if (count >= 10000) {

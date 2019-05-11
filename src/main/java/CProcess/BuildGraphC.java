@@ -1,5 +1,6 @@
 package CProcess;
 
+import CCPP.metadata.TClass;
 import GraphProcess.Graph;
 import GraphProcess.Util;
 import com.google.common.graph.MutableNetwork;
@@ -8,6 +9,7 @@ import org.eclipse.cdt.core.dom.ast.*;
 import org.eclipse.cdt.core.dom.ast.cpp.*;
 import org.eclipse.cdt.internal.core.dom.parser.cpp.*;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,6 +17,12 @@ import java.util.List;
 public class BuildGraphC extends CParseUtil implements Graph {
     public List<IASTNode> mVisitedNodes = new ArrayList<>();
     public List<IASTNode> mVisitedDFGNodes = new ArrayList<>();
+    public List<IASTNode> mVisitedCFGNodes = new ArrayList<>();
+    // For CFG
+    public ArrayList<IASTNode> mPreNodes = new ArrayList<>();
+    public ArrayDeque<IASTNode> mBreakNodes = new ArrayDeque<>();
+    public ArrayDeque<IASTNode> mContinueNodes = new ArrayDeque<>();
+    public ArrayList<IASTNode> mPreTempNodes = new ArrayList<>();
     public int mEdgeNumber;
     public MutableNetwork<Object, String> mNetwork;
     public boolean mAll = true;
@@ -45,6 +53,14 @@ public class BuildGraphC extends CParseUtil implements Graph {
         mVisitedDFGNodes.clear();
         mNetwork = NetworkBuilder.directed().allowsParallelEdges(true).allowsSelfLoops(true).build();
         mEdgeNumber = 0;
+        initCFG();
+    }
+
+    public void initCFG() {
+        mPreNodes.clear();
+        mBreakNodes.clear();
+        mContinueNodes.clear();
+        mPreTempNodes.clear();
     }
 
     public <T extends IASTNode> boolean visitNode(T node) {
@@ -671,6 +687,157 @@ public class BuildGraphC extends CParseUtil implements Graph {
         }
     }
 
+    public <T extends IASTNode> boolean buildCFG(T node) {
+        // 先visit，再 || mAll
+        if (node == null || node instanceof IASTComment) {
+            return false;
+        }
+        boolean add = mAll;
+        if (mVisitedCFGNodes.contains(node)) {
+            return add;
+        }
+        mVisitedCFGNodes.add(node);
+        {
+            if (!mNetwork.nodes().contains(node)) {
+                return mAll;
+            } else {
+                add = true;
+            }
+            if (node instanceof CPPASTTryBlockStatement) {
+                CPPASTTryBlockStatement t = (CPPASTTryBlockStatement) node;
+                addNextExecEdgeForAllPres(node);
+                resetPreNodes(node);
+                buildCFG(t.getTryBody());
+                mPreTempNodes.addAll(mPreNodes);
+                for (ICPPASTCatchHandler catchClause : t.getCatchHandlers()) {
+                    if (buildCFG(catchClause.getCatchBody())) {
+                        addNextExecEdge(t, catchClause.getDeclaration());
+                        resetPreNodes(catchClause.getDeclaration());
+                        mPreTempNodes.addAll(mPreNodes);
+                        resetPreNodes(node);
+                    }
+                }
+                mPreNodes.addAll(mPreTempNodes);
+                return true;
+            }
+            if (node instanceof CPPASTExpressionStatement) {
+                addNextExecEdgeForAllPres(node);
+                resetPreNodes(node);
+                return true;
+            }
+            if (node instanceof CPPASTReturnStatement) {
+                addNextExecEdgeForAllPres(node);
+                resetPreNodes(node);
+                return true;
+            }
+            if (node instanceof CPPASTIfStatement) {
+                processIfStmt((CPPASTIfStatement) node);
+                return true;
+            }
+/*
+            if (node instanceof CPPASTSwitchStatement) {
+                CPPASTSwitchStatement switchStmt = (CPPASTSwitchStatement) node;
+                addNextExecEdgeForAllPres(node);
+                Expression selector = switchStmt.getSelector();
+                addNextExecEdge(node, selector);
+                mPreNodes.clear();
+                mBreakNodes.clear();
+                for (SwitchEntryStmt entry : switchStmt.getEntries()) {
+                    mPreNodes.add(selector);
+                    addNextExecEdgeForAllPres(entry);
+                    entry.getLabel().ifPresent(label -> {
+                        addNextExecEdge(entry, label);
+                    });
+                    resetPreNodes(entry);
+                    buildCFG(entry);
+                }
+                mPreNodes.addAll(mBreakNodes);
+                return true;
+            }
+*/
+            if (node instanceof CPPASTWhileStatement) {
+                CPPASTWhileStatement whileStmt = (CPPASTWhileStatement) node;
+                addNextExecEdgeForAllPres(node);
+                addNextExecEdge(node, whileStmt.getCondition());
+                resetPreNodes(whileStmt.getCondition());
+                mBreakNodes.clear();
+                mContinueNodes.clear();
+                buildCFG(whileStmt.getBody());
+                mPreNodes.addAll(mContinueNodes);
+                addNextExecEdgeForAllPres(node);
+                resetPreNodes(whileStmt.getCondition());
+                mPreNodes.addAll(mBreakNodes);
+                return true;
+            }
+            if (node instanceof CPPASTDoStatement) {
+                CPPASTDoStatement doStmt = (CPPASTDoStatement) node;
+                buildCFG(doStmt.getBody());
+                addNextExecEdgeForAllPres(doStmt.getCondition());
+                resetPreNodes(doStmt.getCondition());
+                buildCFG(doStmt.getBody());
+                resetPreNodes(doStmt.getCondition());
+                return true;
+            }
+/*
+            if (node instanceof CPPASTForStatement) {
+                CPPASTForStatement forStmt = (CPPASTForStatement) node;
+                addNextExecEdgeForAllPres(node);
+                resetPreNodes(forStmt);
+                forStmt.getInitializerStatement().forEach(init -> {
+                    addNextExecEdgeForAllPres(init);
+                    resetPreNodes(init);
+                });
+                forStmt.getConditionExpression().ifPresent(compare -> {
+                    addNextExecEdgeForAllPres(compare);
+                    resetPreNodes(compare);
+                });
+                mBreakNodes.clear();
+                mContinueNodes.clear();
+                buildCFG(forStmt.getBody());
+                mPreNodes.addAll(mContinueNodes);
+                forStmt.getIterationExpression().forEach(update -> {
+                    addNextExecEdgeForAllPres(update);
+                    resetPreNodes(update);
+                });
+                forStmt.getConditionExpression().ifPresent(compare -> {
+                    addNextExecEdgeForAllPres(compare);
+                    resetPreNodes(compare);
+                });
+                mPreNodes.addAll(mBreakNodes);
+                return true;
+            }
+*/
+            if (node instanceof ICPPASTStaticAssertDeclaration) {
+                addNextExecEdgeForAllPres(node);
+                resetPreNodes(node);
+                return true;
+            }
+            if (node instanceof CPPASTLabelStatement) {
+                addNextExecEdgeForAllPres(node);
+                resetPreNodes(node);
+                return true;
+            }
+            if (node instanceof CPPASTBreakStatement) {
+                addNextExecEdgeForAllPres(node);
+                mPreNodes.clear();
+                mBreakNodes.push(node);
+                return true;
+            }
+            if (node instanceof CPPASTContinueStatement) {
+                addNextExecEdgeForAllPres(node);
+                mPreNodes.clear();
+                mContinueNodes.push(node);
+                return true;
+            }
+            {
+                for (IASTNode child : node.getChildren()) {
+                    buildCFG(child);
+                }
+                return true;
+            }
+        }
+    }
+
     public <T extends IASTNode> boolean buildDFG(T node) {
         // 先visit，再 || mAll
         if (node == null || node instanceof IASTComment) {
@@ -892,6 +1059,45 @@ public class BuildGraphC extends CParseUtil implements Graph {
         addLastUse(variableName, mLastUse);
         addLastWrite(variableName, mLastWrite);
         mLastUse = variableName;
+    }
+
+    public void processIfStmt(CPPASTIfStatement ifStmt) {
+        addNextExecEdgeForAllPres(ifStmt);
+        buildCFG(ifStmt.getConditionExpression());
+        addNextExecEdge(ifStmt, ifStmt.getConditionExpression());
+        resetPreNodes(ifStmt.getConditionExpression());
+        buildCFG(ifStmt.getThenClause());
+        // 把 true 的结果保存到 mPreTempNodes
+        // mPreTempNodes = mPreNodes; 绝对不能这样写，这样写是引用赋值
+        mPreTempNodes.addAll(mPreNodes);
+        resetPreNodes(ifStmt.getConditionExpression());
+        IASTStatement elseStmt = ifStmt.getElseClause();
+        if (mNetwork.nodes().contains(elseStmt)){
+            addNextExecEdgeForAllPres(elseStmt);
+            if (elseStmt instanceof CPPASTIfStatement) {
+                processIfStmt((CPPASTIfStatement) elseStmt);
+            } else {
+                resetPreNodes(elseStmt);
+                buildCFG(elseStmt);
+            }
+        }
+        mPreNodes.addAll(mPreTempNodes);
+        mPreTempNodes.clear();
+    }
+
+    public void resetPreNodes(IASTNode newPre) {
+        mPreNodes.clear();
+        mPreNodes.add(newPre);
+    }
+
+    public void addNextExecEdgeForAllPres(IASTNode succNode) {
+        for (IASTNode preNode : mPreNodes) {
+            addNextExecEdge(preNode, succNode);
+        }
+    }
+
+    public void addNextExecEdge(IASTNode pre, IASTNode succ) {
+        putEdge(pre, succ, EDGE_NEXT_EXEC);
     }
 
     public void addLastWriteList(List<IASTName> nowNodes, IASTName lastWrite) {

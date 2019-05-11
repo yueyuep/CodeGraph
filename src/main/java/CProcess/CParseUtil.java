@@ -240,6 +240,9 @@ public class CParseUtil {
 
     public <T extends IASTNode> List<T> findAll(IASTNode node, Class<T> tClass) {
         List<T> nodes = new ArrayList<>();
+        if (node == null) {
+            return nodes;
+        }
         for (IASTNode child : node.getChildren()) {
             if (tClass.isInstance(child)) {
                 nodes.add((T) child);
