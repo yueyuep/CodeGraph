@@ -25,6 +25,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
     public ArrayList<IASTNode> mPreTempNodes = new ArrayList<>();
     public int mEdgeNumber;
     public MutableNetwork<Object, String> mNetwork;
+//    public MutableNetwork<Object, String> mCFGNetwork;
     public boolean mAll = true;
     public IASTFunctionDefinition mFunctionDefinition;
     public IASTName mLastUse;
@@ -52,6 +53,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
         mVisitedNodes.clear();
         mVisitedDFGNodes.clear();
         mNetwork = NetworkBuilder.directed().allowsParallelEdges(true).allowsSelfLoops(true).build();
+//        mCFGNetwork = NetworkBuilder.directed().allowsParallelEdges(true).allowsSelfLoops(true).build();
         mEdgeNumber = 0;
         initCFG();
     }
@@ -720,11 +722,6 @@ public class BuildGraphC extends CParseUtil implements Graph {
                 mPreNodes.addAll(mPreTempNodes);
                 return true;
             }
-            if (node instanceof CPPASTExpressionStatement) {
-                addNextExecEdgeForAllPres(node);
-                resetPreNodes(node);
-                return true;
-            }
             if (node instanceof CPPASTReturnStatement) {
                 addNextExecEdgeForAllPres(node);
                 resetPreNodes(node);
@@ -734,27 +731,26 @@ public class BuildGraphC extends CParseUtil implements Graph {
                 processIfStmt((CPPASTIfStatement) node);
                 return true;
             }
-/*
             if (node instanceof CPPASTSwitchStatement) {
                 CPPASTSwitchStatement switchStmt = (CPPASTSwitchStatement) node;
                 addNextExecEdgeForAllPres(node);
-                Expression selector = switchStmt.getSelector();
-                addNextExecEdge(node, selector);
-                mPreNodes.clear();
-                mBreakNodes.clear();
-                for (SwitchEntryStmt entry : switchStmt.getEntries()) {
-                    mPreNodes.add(selector);
-                    addNextExecEdgeForAllPres(entry);
-                    entry.getLabel().ifPresent(label -> {
-                        addNextExecEdge(entry, label);
-                    });
-                    resetPreNodes(entry);
-                    buildCFG(entry);
+                if (buildCFG(switchStmt.getControllerExpression())) {
+                    addNextExecEdge(node, switchStmt.getControllerExpression());
+                    mPreNodes.clear();
+                    mBreakNodes.clear();
                 }
-                mPreNodes.addAll(mBreakNodes);
+                if (buildCFG(switchStmt.getBody())) {
+                    for (IASTNode child : switchStmt.getBody().getChildren()) {
+                        if (buildCFG(child)) {
+                            mPreNodes.add(switchStmt.getControllerExpression());
+                            addNextExecEdgeForAllPres(child);
+                            resetPreNodes(child);
+                        }
+                    }
+                    mPreNodes.addAll(mBreakNodes);
+                }
                 return true;
             }
-*/
             if (node instanceof CPPASTWhileStatement) {
                 CPPASTWhileStatement whileStmt = (CPPASTWhileStatement) node;
                 addNextExecEdgeForAllPres(node);
@@ -778,35 +774,34 @@ public class BuildGraphC extends CParseUtil implements Graph {
                 resetPreNodes(doStmt.getCondition());
                 return true;
             }
-/*
             if (node instanceof CPPASTForStatement) {
                 CPPASTForStatement forStmt = (CPPASTForStatement) node;
                 addNextExecEdgeForAllPres(node);
                 resetPreNodes(forStmt);
-                forStmt.getInitializerStatement().forEach(init -> {
-                    addNextExecEdgeForAllPres(init);
-                    resetPreNodes(init);
-                });
-                forStmt.getConditionExpression().ifPresent(compare -> {
-                    addNextExecEdgeForAllPres(compare);
-                    resetPreNodes(compare);
-                });
+                if (buildCFG(forStmt.getInitializerStatement())) {
+                    addNextExecEdgeForAllPres(forStmt.getInitializerStatement());
+                    resetPreNodes(forStmt.getInitializerStatement());
+                }
+                if (buildCFG(forStmt.getConditionExpression())) {
+                    addNextExecEdgeForAllPres(forStmt.getConditionExpression());
+                    resetPreNodes(forStmt.getConditionExpression());
+                }
                 mBreakNodes.clear();
                 mContinueNodes.clear();
-                buildCFG(forStmt.getBody());
-                mPreNodes.addAll(mContinueNodes);
-                forStmt.getIterationExpression().forEach(update -> {
-                    addNextExecEdgeForAllPres(update);
-                    resetPreNodes(update);
-                });
-                forStmt.getConditionExpression().ifPresent(compare -> {
-                    addNextExecEdgeForAllPres(compare);
-                    resetPreNodes(compare);
-                });
+                if (buildCFG(forStmt.getBody())) {
+                    mPreNodes.addAll(mContinueNodes);
+                }
+                if (buildCFG(forStmt.getIterationExpression())) {
+                    addNextExecEdgeForAllPres(forStmt.getIterationExpression());
+                    resetPreNodes(forStmt.getIterationExpression());
+                }
+                if (buildCFG(forStmt.getConditionExpression())) {
+                    addNextExecEdgeForAllPres(forStmt.getConditionExpression());
+                    resetPreNodes(forStmt.getConditionExpression());
+                }
                 mPreNodes.addAll(mBreakNodes);
                 return true;
             }
-*/
             if (node instanceof ICPPASTStaticAssertDeclaration) {
                 addNextExecEdgeForAllPres(node);
                 resetPreNodes(node);
@@ -827,6 +822,29 @@ public class BuildGraphC extends CParseUtil implements Graph {
                 addNextExecEdgeForAllPres(node);
                 mPreNodes.clear();
                 mContinueNodes.push(node);
+                return true;
+            }
+            if (node instanceof CPPASTExpressionStatement) {
+                addNextExecEdgeForAllPres(node);
+                resetPreNodes(node);
+                return true;
+            }
+            if (node instanceof CPPASTDeclarationStatement) {
+                addNextExecEdgeForAllPres(node);
+                resetPreNodes(node);
+                return true;
+            }
+            if (node instanceof CPPASTCompoundStatement) {
+                addNextExecEdgeForAllPres(node);
+                resetPreNodes(node);
+                for (IASTNode child : node.getChildren()) {
+                    buildCFG(child);
+                }
+                return true;
+            }
+            if (node instanceof IASTStatement) {
+                addNextExecEdgeForAllPres(node);
+                resetPreNodes(node);
                 return true;
             }
             {
@@ -1214,6 +1232,9 @@ public class BuildGraphC extends CParseUtil implements Graph {
             return;
         }
         mNetwork.addEdge(nodeU, nodeV, edgeType + "_" + mEdgeNumber);
+//        if (edgeType.contains(EDGE_NEXT_EXEC)) {
+//            mCFGNetwork.addEdge(nodeU, nodeV, edgeType + "_" + mEdgeNumber);
+//        }
         mEdgeNumber = mEdgeNumber + 1;
     }
 

@@ -37,8 +37,9 @@ public class ParseC {
                         continue;
                     }
                 }
-//                bc.visitNode(dec);
-                bc.buildDFG(dec);
+                bc.visitNode(dec);
+//                bc.buildDFG(dec);
+                bc.buildCFG(dec);
                 System.out.println("END=============");
             }
         }

@@ -12,12 +12,13 @@ import java.util.List;
 
 public class ICMAL {
     public static void main(String[] args) {
-        getGraphs();
+        getGraphs("ctest");
+//        getGraphs("valid");
+//        getGraphs("train");
     }
 
-    private static void getGraphs() {
+    private static void getGraphs(String cat) {
         String des = "../benchmark/";
-        String cat = "ctest";
         {
             String fileDir = des + cat + "/" + "true/";
             File dir = new File(fileDir.replace("true", "trueg"));
@@ -37,10 +38,11 @@ public class ICMAL {
                 dir.mkdir();
             }
             File[] files = new File(fileDir).listFiles();
-            List<File> filesList = Arrays.asList(files);
+//            List<File> filesList = Arrays.asList(files);
 //            Collections.shuffle(filesList);
 //            int count = 0;
-            for (File file : filesList) {
+            for (File file : files) {
+//            for (File file : filesList) {
 //                if (count >= 10000) {
 //                    break;
 //                }
@@ -68,6 +70,7 @@ public class ICMAL {
             bc.initNetwork();
             bc.visitNode(dec);
             bc.buildDFG(dec);
+            bc.buildCFG(dec);
             MutableNetwork<Object, String> network = bc.getNetwork();
             if (!network.edges().isEmpty()) {
                 Graph2Json graph2Json = Graph2Json.newInstance(network);
