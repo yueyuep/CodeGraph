@@ -11,12 +11,14 @@ import java.util.List;
  */
 public class ParseC {
     public static void main(String[] args) {
+        String fcsard = "cf/117923/CWE789_Uncontrolled_Mem_Alloc__new_wchar_t_rand_45.cpp";
         String fcpp = "cf/CWE401.cpp";
         String fc = "cf/CWE761.c";
         String fc1 = "cf/10-476_test.c";
         String fc2 = "cf/63-119-120_test.c";
         String fc3 = "cf/0_test.c";
         List<String> files = new ArrayList<>();
+        files.add(fcsard);
         files.add(fc3);
         files.add(fcpp);
         files.add(fc);
@@ -37,9 +39,10 @@ public class ParseC {
                         continue;
                     }
                 }
-                bc.visitNode(dec);
+                bc.buildGraph(dec);
+//                bc.visitNode(dec);
 //                bc.buildDFG(dec);
-                bc.buildCFG(dec);
+//                bc.buildCFG(dec);
                 System.out.println("END=============");
             }
         }

@@ -9,6 +9,11 @@ import org.eclipse.cdt.internal.core.dom.parser.cpp.CPPASTFunctionCallExpression
 import org.eclipse.cdt.internal.core.dom.parser.cpp.CPPASTFunctionDeclarator;
 
 import java.io.File;
+import java.lang.reflect.MalformedParameterizedTypeException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class CSARD {
     public static void main(String[] args) {
@@ -26,15 +31,45 @@ public class CSARD {
         for (File subDir : new File(source).listFiles()) {
             File[] cweFiles = subDir.listFiles();
             if (cweFiles.length == 1) {
+                continue;
+/*
                 File cwe = cweFiles[0];
                 if (cwe.getName().startsWith("CWE")) {
-                    genSaveSardGraph(cwe.getPath(), cwe.getName(), desT, desF);
+                    genSaveSardSingelGraph(cwe.getPath(), cwe.getName(), desT, desF);
                 }
+*/
+            }
+            if (cweFiles.length > 1) {
+                genSaveSardMultiGraph(cweFiles);
             }
         }
     }
 
-    public static void genSaveSardGraph(String filePath, String fileName, String desDirT, String desDirF) {
+    public static void genSaveSardMultiGraph(File[] files) {
+        Map<File, BuildGraphC> fileGraphMap = new HashMap<>();
+        for (File file : files) {
+            BuildGraphC bc = BuildGraphC.newFromFile(file.getPath());
+            if (bc == null) {
+                System.out.println("Null: " + file.getPath());
+            } else {
+                fileGraphMap.put(file, bc);
+            }
+        }
+        File aFile = null;
+        for (File file : fileGraphMap.keySet()) {
+            if (file.getName().endsWith("a.cpp") || file.getName().endsWith("a.c")) {
+                aFile = file;
+                break;
+            }
+        }
+        if (aFile == null) {
+            return;
+        }
+        BuildGraphC aBC = fileGraphMap.get(aFile);
+
+    }
+
+    public static void genSaveSardSingelGraph(String filePath, String fileName, String desDirT, String desDirF) {
         BuildGraphC bc = BuildGraphC.newFromFile(filePath);
         if (bc == null) {
             System.out.println("Null: " + filePath);
