@@ -67,10 +67,7 @@ public class ICMAL {
                     continue;
                 }
             }
-            bc.initNetwork();
-            bc.visitNode(dec);
-            bc.buildDFG(dec);
-            bc.buildCFG(dec);
+            bc.buildGraph(dec);
             MutableNetwork<Object, String> network = bc.getNetwork();
             if (!network.edges().isEmpty()) {
                 Graph2Json graph2Json = Graph2Json.newInstance(network);

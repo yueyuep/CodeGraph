@@ -30,6 +30,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
     public IASTFunctionDefinition mFunctionDefinition;
     public IASTName mLastUse;
     public IASTName mLastWrite;
+    private List<IASTFunctionDefinition> mCalledMethodDecls = new ArrayList<>();
 
 
     private BuildGraphC(String srcFilePath) {
@@ -48,8 +49,6 @@ public class BuildGraphC extends CParseUtil implements Graph {
     }
 
     public void initNetwork() {
-        mLastUse = null;
-        mLastWrite = null;
         mVisitedNodes.clear();
         mVisitedDFGNodes.clear();
         mNetwork = NetworkBuilder.directed().allowsParallelEdges(true).allowsSelfLoops(true).build();
@@ -59,10 +58,35 @@ public class BuildGraphC extends CParseUtil implements Graph {
     }
 
     public void initCFG() {
+        mVisitedCFGNodes.clear();
+        mLastUse = null;
+        mLastWrite = null;
         mPreNodes.clear();
         mBreakNodes.clear();
         mContinueNodes.clear();
         mPreTempNodes.clear();
+    }
+
+    public void travelCalled() {
+        if (mCalledMethodDecls.isEmpty()) {
+            return;
+        }
+        IASTFunctionDefinition called = mCalledMethodDecls.remove(0);
+        if (!mVisitedNodes.contains(called)) {
+            initCFG();
+            visitNode(called);
+            buildCFG(called);
+            buildDFG(called);
+        }
+        travelCalled();
+    }
+
+    public <T extends IASTNode> void buildGraph(T node) {
+        initNetwork();
+        visitNode(node);
+        buildDFG(node);
+        buildCFG(node);
+        travelCalled();
     }
 
     public <T extends IASTNode> boolean visitNode(T node) {
@@ -400,6 +424,9 @@ public class BuildGraphC extends CParseUtil implements Graph {
                     }
                 }
                 mAll = tmpAll;
+                if (add || mAll) {
+                    addMethodCallFor(fc);
+                }
                 return add || mAll;
             }
             if (node instanceof CPPASTLambdaExpression) {
@@ -686,6 +713,33 @@ public class BuildGraphC extends CParseUtil implements Graph {
             {
                 return isAddChildAndNext(add, node) || mAll;
             }
+        }
+    }
+
+    public void addMethodCallFor(CPPASTFunctionCallExpression functionCaller) {
+        if (findAll(functionCaller.getFunctionNameExpression(), IASTName.class).size() == 1) {
+            String functionCallName = findAll(functionCaller.getFunctionNameExpression(), IASTName.class).get(0).toString();
+            for (IASTFunctionDefinition called : mFunctionDefinitions) {
+                CPPASTFunctionDeclarator fdTor = (CPPASTFunctionDeclarator) called.getDeclarator();
+                if (functionCallName.equals(fdTor.getName().toString())
+                        && functionCaller.getArguments().length == fdTor.getParameters().length) {
+                    addFormalArgs(functionCaller, fdTor);
+                    addMethodCall(functionCaller, called);
+                    break;
+                }
+            }
+        }
+    }
+
+    public void addMethodCall(CPPASTFunctionCallExpression caller, IASTFunctionDefinition called) {
+        putEdge(caller, called, EDGE_METHOD_CALL);
+        mCalledMethodDecls.add(called);
+    }
+
+    public void addFormalArgs(CPPASTFunctionCallExpression caller, CPPASTFunctionDeclarator called) {
+        ICPPASTParameterDeclaration[] parameters = called.getParameters();
+        for (int i = 0; i < parameters.length; i++) {
+            putEdge(caller.getArguments()[i], parameters[i].getDeclarator().getName(), EDGE_FORMAL_ARG_NAME);
         }
     }
 
