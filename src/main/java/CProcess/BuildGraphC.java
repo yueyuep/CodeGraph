@@ -83,6 +83,10 @@ public class BuildGraphC extends CParseUtil implements Graph {
 
     public <T extends IASTNode> void buildGraph(T node) {
         initNetwork();
+        buildGraphWithoutInit(node);
+    }
+
+    public <T extends IASTNode> void buildGraphWithoutInit(T node) {
         visitNode(node);
         buildDFG(node);
         buildCFG(node);
@@ -293,7 +297,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
             }
             if (node instanceof CPPASTBinaryExpression) {
                 CPPASTBinaryExpression b = (CPPASTBinaryExpression) node;
-                String operator = getOperatorString(b.getOperator());
+                StringCapsule operator = StringCapsule.newInstance(getOperatorString(b.getOperator()));
                 if (b.getOperator() == 17) { // Operator 17: =
                     boolean assigned = visitNode(b.getOperand1());
                     if (assigned) {
@@ -333,7 +337,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
                 CPPASTUnaryExpression u = (CPPASTUnaryExpression) node;
                 if (visitNode(u.getOperand())) {
                     addChildNode(u, u.getOperand());
-                    String operator = getOperatorString(u.getOperator());
+                    StringCapsule operator = StringCapsule.newInstance(getOperatorString(u.getOperator()));
                     addChildToken(u, operator);
                     addNextNode(operator, u.getOperand());
                     add = true;
@@ -505,7 +509,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
             }
             if (node instanceof CPPASTCastExpression) {
                 CPPASTCastExpression ca = (CPPASTCastExpression) node;
-                String operator = getOperatorString(ca.getOperator());
+                StringCapsule operator = StringCapsule.newInstance(getOperatorString(ca.getOperator()));
                 if (visitNode(ca.getOperand())) {
                     addChildNode(ca, ca.getOperand());
                     addChildToken(ca, operator);
@@ -1224,7 +1228,7 @@ public class BuildGraphC extends CParseUtil implements Graph {
                 mAll = true;
                 visitNode(node.getInitializer());
                 addChildNode(node, node.getInitializer());
-                String initialize = "initialize";
+                StringCapsule initialize = StringCapsule.newInstance("initialize");
                 addChildToken(node, initialize);
                 addNextNode(node.getName(), initialize);
                 addNextNode(initialize, node.getInitializer());
@@ -1294,5 +1298,17 @@ public class BuildGraphC extends CParseUtil implements Graph {
 
     public MutableNetwork<Object, String> getNetwork() {
         return mNetwork;
+    }
+
+    public void setNetwork(MutableNetwork<Object, String> network) {
+        mNetwork = network;
+    }
+
+    public int getEdgeNumber() {
+        return mEdgeNumber;
+    }
+
+    public void setEdgeNumber(int edgeNumber) {
+        mEdgeNumber = edgeNumber;
     }
 }

@@ -1,5 +1,6 @@
 package GraphProcess;
 
+import CProcess.StringCapsule;
 import Util.SplitString;
 import com.github.javaparser.ast.ArrayCreationLevel;
 import com.github.javaparser.ast.Modifier;
@@ -81,6 +82,8 @@ public class Graph2Json {
 //            mFeatures.add(SplitString.splitUntilUpperCase(Util.getClassLastName(node)));
             mFeatures.add(SplitString.splitUntilUpperCase(cls));
 //            mFeatures.add(travelNode(((RangeNode) node).getNode()));
+        } else if (node instanceof StringCapsule) {
+            mFeatures.add(((StringCapsule) node).getString());
         } else if (node instanceof String) {
             mFeatures.add(node.toString());
         } else {

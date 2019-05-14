@@ -5,8 +5,8 @@ import com.google.common.graph.MutableNetwork;
 import org.eclipse.cdt.core.dom.ast.IASTCompoundStatement;
 import org.eclipse.cdt.core.dom.ast.IASTFunctionDefinition;
 import org.eclipse.cdt.core.dom.ast.IASTName;
-import org.eclipse.cdt.internal.core.dom.parser.cpp.CPPASTFunctionCallExpression;
-import org.eclipse.cdt.internal.core.dom.parser.cpp.CPPASTFunctionDeclarator;
+import org.eclipse.cdt.core.dom.ast.IASTNode;
+import org.eclipse.cdt.internal.core.dom.parser.cpp.*;
 
 import java.io.File;
 import java.lang.reflect.MalformedParameterizedTypeException;
@@ -17,12 +17,15 @@ import java.util.Map;
 
 public class CSARD {
     public static void main(String[] args) {
-        getSARDGraphs("CWE-399-SARD", "CWE-399-SARDG");
+        getSARDGraphs("cf", "cfg");
+//        getSARDGraphs("CWE-399-SARD", "CWE-399-SARDG");
     }
 
     private static void getSARDGraphs(String sourceDir, String graphDir) {
-        String source = "../benchmark/" + sourceDir + "/";
-        String des = "../benchmark/" + graphDir + "/";
+        String source = "../CodeGraph/" + sourceDir + "/";
+        String des = "../CodeGraph/" + graphDir + "/";
+//        String source = "../benchmark/" + sourceDir + "/";
+//        String des = "../benchmark/" + graphDir + "/";
         String desT = des + "trueg/";
         String desF = des + "falseg/";
         mkdirIfNotExists(des);
@@ -40,14 +43,17 @@ public class CSARD {
 */
             }
             if (cweFiles.length > 1) {
-                genSaveSardMultiGraph(cweFiles);
+                genSaveSardMultiGraph(cweFiles, desT, desF);
             }
         }
     }
 
-    public static void genSaveSardMultiGraph(File[] files) {
+    public static void genSaveSardMultiGraph(File[] files, String desDirT, String desDirF) {
         Map<File, BuildGraphC> fileGraphMap = new HashMap<>();
         for (File file : files) {
+            if (file.getName().endsWith(".h")) {
+                continue;
+            }
             BuildGraphC bc = BuildGraphC.newFromFile(file.getPath());
             if (bc == null) {
                 System.out.println("Null: " + file.getPath());
@@ -66,7 +72,131 @@ public class CSARD {
             return;
         }
         BuildGraphC aBC = fileGraphMap.get(aFile);
+        int falseG = 0;
+        int trueG = 0;
+        for (IASTFunctionDefinition dec : aBC.getFunctionDefinitions()) {
+            CPPASTFunctionDeclarator fdTor = (CPPASTFunctionDeclarator) dec.getDeclarator();
+            String funcName = fdTor.getName().toString();
+            if (funcName.endsWith("bad")) {
+                trueG = getGraphCrossMultiFile(aBC, dec, fileGraphMap, desDirT, aFile, trueG);
+                System.out.println(trueG);
+            }
+            aBC.initNetwork();
+            if (funcName.endsWith("good")) {
+                for (CPPASTFunctionCallExpression fc : aBC.findAll(dec, CPPASTFunctionCallExpression.class)) {
+                    String functionCallName = aBC.findAll(fc.getFunctionNameExpression(), IASTName.class).get(0).toString();
+                    for (IASTFunctionDefinition calledFuncDef : aBC.getFunctionDefinitions()) {
+                        CPPASTFunctionDeclarator calledFdTor = (CPPASTFunctionDeclarator) calledFuncDef.getDeclarator();
+                        String calledName = calledFdTor.getName().toString();
+                        if (functionCallName.equals(calledName)) {
+                            aBC.initNetwork();
+                            falseG = getGraphCrossMultiFile(aBC, calledFuncDef, fileGraphMap, desDirF, aFile, falseG);
+                            System.out.println(falseG);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
+    // TODO：不知为何加入了无连接的bad::action()声明
+    public static int getGraphCrossMultiFile(BuildGraphC aBC, IASTFunctionDefinition funcDef,
+                                             Map<File, BuildGraphC> fileGraphMap, String desDir, File aFile, int graphNum) {
+        aBC.initNetwork();
+        Map<File, List<IASTFunctionDefinition>> visitedFileFunc = new HashMap<>();
+        getFuncDefGraphInMultiFiles(aBC, funcDef, fileGraphMap, aFile, visitedFileFunc);
+        MutableNetwork<Object, String> network = aBC.getNetwork();
+        if (!network.edges().isEmpty()) {
+            graphNum++;
+            Graph2Json graph2Json = Graph2Json.newInstance(network);
+            graph2Json.saveToJson(desDir + aFile.getName() + "_" + graphNum + "_.txt");
+            System.out.println(desDir + aFile.getName() + "_" + graphNum + "_.txt");
+        }
+        return graphNum;
+    }
+
+    private static void getFuncDefGraphInMultiFiles(BuildGraphC bc, IASTFunctionDefinition funcDefinition,
+                                                   Map<File, BuildGraphC> fileGraphMap, File file,
+                                                   Map<File, List<IASTFunctionDefinition>> visitedFileFunc) {
+        bc.buildGraphWithoutInit(funcDefinition);
+        // 将已经构建图的方法声明保存到Map，后面进行检查，以免重复构图。
+        if (!visitedFileFunc.containsKey(file)) {
+            visitedFileFunc.put(file, new ArrayList<>());
+        }
+        for (Object node : bc.getNetwork().nodes()) {
+            if (node instanceof IASTFunctionDefinition) {
+                visitedFileFunc.get(file).add((IASTFunctionDefinition) node);
+            }
+        }
+        List<CPPASTFunctionCallExpression> visitedFuncCall = new ArrayList<>();
+        // C++中类的名字与其他文件的名字是否一样，若一样则检查方法调用与FieldReference是否在那个文件中声明
+        for (CPPASTName className : bc.findAll(funcDefinition, CPPASTName.class)) {
+            if (className.toString().endsWith("base")) {
+                continue;
+            }
+            for (File otherFile : fileGraphMap.keySet()) {
+                if (!otherFile.getName().equals(file.getName()) && otherFile.getName().contains(className.toString())) {
+                    if (!fileGraphMap.containsKey(otherFile)) {
+                        System.out.println("Not contain the file: " + otherFile.getName());
+                        continue;
+                    }
+                    BuildGraphC otherBC = fileGraphMap.get(otherFile);
+                    for (CPPASTFunctionCallExpression fc : bc.findAll(funcDefinition, CPPASTFunctionCallExpression.class)) {
+                        if (visitedFuncCall.contains(fc)) {
+                            continue;
+                        }
+                        String functionCallName;
+                        if (fc.getFunctionNameExpression() instanceof CPPASTFieldReference) {
+                            functionCallName = ((CPPASTFieldReference) fc.getFunctionNameExpression()).getFieldName().toString();
+                        } else {
+                            functionCallName = bc.findAll(fc.getFunctionNameExpression(), IASTName.class).get(0).toString();
+                        }
+                        connectFuncCallToOtherFile(bc, fileGraphMap, visitedFileFunc, visitedFuncCall, fc, functionCallName, otherFile, otherBC);
+                    }
+                }
+            }
+        }
+        // C中方法的名字与其他文件的方法名字是否一样
+        for (CPPASTFunctionCallExpression fc : bc.findAll(funcDefinition, CPPASTFunctionCallExpression.class)) {
+            if (visitedFuncCall.contains(fc)) {
+                continue;
+            }
+            String functionCallName = bc.findAll(fc.getFunctionNameExpression(), IASTName.class).get(0).toString();
+            for (File otherFile : fileGraphMap.keySet()) {
+                if (!fileGraphMap.containsKey(otherFile)) {
+                    System.out.println("Not contain the file: " + otherFile.getName());
+                    continue;
+                }
+                BuildGraphC otherBC = fileGraphMap.get(otherFile);
+                connectFuncCallToOtherFile(bc, fileGraphMap, visitedFileFunc, visitedFuncCall, fc, functionCallName, otherFile, otherBC);
+            }
+        }
+    }
+
+    private static void connectFuncCallToOtherFile(BuildGraphC bc, Map<File, BuildGraphC> fileGraphMap, Map<File,
+            List<IASTFunctionDefinition>> visitedFileFunc, List<CPPASTFunctionCallExpression> visitedFuncCall,
+                                                   CPPASTFunctionCallExpression fc, String functionCallName,
+                                                   File otherFile, BuildGraphC otherBC) {
+        for (IASTFunctionDefinition calledFuncDef : otherBC.getFunctionDefinitions()) {
+            CPPASTFunctionDeclarator calledFdTor = (CPPASTFunctionDeclarator) calledFuncDef.getDeclarator();
+            if ((functionCallName.equals(calledFdTor.getName().toString()) || calledFdTor.getName().toString().contains(functionCallName))
+                    && fc.getArguments().length == calledFdTor.getParameters().length) {
+                visitedFuncCall.add(fc);
+                // 添加方法调用边
+                bc.addFormalArgs(fc, calledFdTor);
+                bc.addMethodCall(fc, calledFuncDef);
+                // 在已经构造的图的基础上，对被调方法的声明构图
+                if (visitedFileFunc.containsKey(otherFile) && visitedFileFunc.get(otherFile).contains(calledFuncDef)) {
+                    continue;
+                }
+                otherBC.initNetwork();
+                otherBC.setNetwork(bc.getNetwork());
+                otherBC.setEdgeNumber(bc.getEdgeNumber());
+                getFuncDefGraphInMultiFiles(otherBC, calledFuncDef, fileGraphMap, otherFile, visitedFileFunc);
+                bc.setNetwork(otherBC.getNetwork());
+                bc.setEdgeNumber(otherBC.getEdgeNumber());
+            }
+        }
     }
 
     public static void genSaveSardSingelGraph(String filePath, String fileName, String desDirT, String desDirF) {
@@ -80,18 +210,18 @@ public class CSARD {
         for (IASTFunctionDefinition dec : bc.getFunctionDefinitions()) {
             CPPASTFunctionDeclarator fdTor = (CPPASTFunctionDeclarator) dec.getDeclarator();
             String funcName = fdTor.getName().toString();
-            if (funcName.equals("bad") || funcName.endsWith("bad")) {
-                trueG = getFuncDefGraph(fileName, desDirT, bc, trueG, dec);
+            if (funcName.endsWith("bad")) { // bad()方法只有一个
+                trueG = getFuncDefGraph(bc, dec, fileName, desDirT, trueG);
             }
             bc.initNetwork();
-            if (funcName.equals("good") || funcName.endsWith("good")) {
+            if (funcName.endsWith("good")) { // good()方法里有多个goodXXX()方法调用，每一个方法调用都是一个独立的图
                 for (CPPASTFunctionCallExpression fc : bc.findAll(dec, CPPASTFunctionCallExpression.class)) {
                     String functionCallName = bc.findAll(fc.getFunctionNameExpression(), IASTName.class).get(0).toString();
                     for (IASTFunctionDefinition calledFuncDef : bc.getFunctionDefinitions()) {
                         CPPASTFunctionDeclarator calledFdTor = (CPPASTFunctionDeclarator) calledFuncDef.getDeclarator();
                         String calledName = calledFdTor.getName().toString();
                         if (functionCallName.equals(calledName)) {
-                            falseG = getFuncDefGraph(fileName, desDirF, bc, falseG, calledFuncDef);
+                            falseG = getFuncDefGraph(bc, calledFuncDef, fileName, desDirF, falseG);
                         }
                     }
                 }
@@ -99,8 +229,8 @@ public class CSARD {
         }
     }
 
-    public static int getFuncDefGraph(String fileName, String desDirName, BuildGraphC bc, int graphNum, IASTFunctionDefinition calledFuncDef) {
-        bc.buildGraph(calledFuncDef);
+    public static int getFuncDefGraph(BuildGraphC bc, IASTFunctionDefinition funcDefinition, String fileName, String desDirName, int graphNum) {
+        bc.buildGraph(funcDefinition);
         MutableNetwork<Object, String> network = bc.getNetwork();
         if (!network.edges().isEmpty()) {
             graphNum++;

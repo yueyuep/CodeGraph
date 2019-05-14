@@ -11,6 +11,7 @@ import java.util.List;
  */
 public class ParseC {
     public static void main(String[] args) {
+        String fcsarda = "cf/112708/CWE761_Free_Pointer_Not_at_Start_of_Buffer__char_file_82a.cpp";
         String fcsard = "cf/117923/CWE789_Uncontrolled_Mem_Alloc__new_wchar_t_rand_45.cpp";
         String fcpp = "cf/CWE401.cpp";
         String fc = "cf/CWE761.c";
@@ -18,6 +19,7 @@ public class ParseC {
         String fc2 = "cf/63-119-120_test.c";
         String fc3 = "cf/0_test.c";
         List<String> files = new ArrayList<>();
+        files.add(fcsarda);
         files.add(fcsard);
         files.add(fc3);
         files.add(fcpp);
