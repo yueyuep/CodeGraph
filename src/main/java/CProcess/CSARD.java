@@ -78,10 +78,13 @@ public class CSARD {
             CPPASTFunctionDeclarator fdTor = (CPPASTFunctionDeclarator) dec.getDeclarator();
             String funcName = fdTor.getName().toString();
             if (funcName.endsWith("bad")) {
+                for (File file : fileGraphMap.keySet()) {
+                    fileGraphMap.put(file, BuildGraphC.newFromFile(file.getPath()));
+                }
+                aBC = fileGraphMap.get(aFile);
                 trueG = getGraphCrossMultiFile(aBC, dec, fileGraphMap, desDirT, aFile, trueG);
                 System.out.println(trueG);
             }
-            aBC.initNetwork();
             if (funcName.endsWith("good")) {
                 for (CPPASTFunctionCallExpression fc : aBC.findAll(dec, CPPASTFunctionCallExpression.class)) {
                     String functionCallName = aBC.findAll(fc.getFunctionNameExpression(), IASTName.class).get(0).toString();
@@ -89,7 +92,10 @@ public class CSARD {
                         CPPASTFunctionDeclarator calledFdTor = (CPPASTFunctionDeclarator) calledFuncDef.getDeclarator();
                         String calledName = calledFdTor.getName().toString();
                         if (functionCallName.equals(calledName)) {
-                            aBC.initNetwork();
+                            for (File file : fileGraphMap.keySet()) {
+                                fileGraphMap.put(file, BuildGraphC.newFromFile(file.getPath()));
+                            }
+                            aBC = fileGraphMap.get(aFile);
                             falseG = getGraphCrossMultiFile(aBC, calledFuncDef, fileGraphMap, desDirF, aFile, falseG);
                             System.out.println(falseG);
                         }
@@ -130,7 +136,7 @@ public class CSARD {
         }
         List<CPPASTFunctionCallExpression> visitedFuncCall = new ArrayList<>();
         // C++中类的名字与其他文件的名字是否一样，若一样则检查方法调用与FieldReference是否在那个文件中声明
-        for (CPPASTName className : bc.findAll(funcDefinition, CPPASTName.class)) {
+        for (CPPASTName className : bc.findAll(funcDefinition.getBody(), CPPASTName.class)) {
             if (className.toString().endsWith("base")) {
                 continue;
             }
