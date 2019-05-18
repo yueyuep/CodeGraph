@@ -71,12 +71,12 @@ public class BenchmarkTest00001 extends HttpServlet {
 				c = javax.crypto.Cipher.getInstance("DES/CBC/PKCS5PADDING", java.security.Security.getProvider("SunJCE"));
 			}
 		} catch (java.security.NoSuchAlgorithmException e) {
-			System.out.println("Problem executing crypto - javax.crypto.Cipher.getInstance(java.lang.String,java.security.Provider) Test Case");
+			System.out.println("Problem executing crypto - javax.crypto.Cipher.getGsonInstance(java.lang.String,java.security.Provider) Test Case");
 			throw new ServletException(e);
 		} catch (javax.crypto.NoSuchPaddingException e) {
-			System.out.println("Problem executing crypto - javax.crypto.Cipher.getInstance(java.lang.String,java.security.Provider) Test Case");
+			System.out.println("Problem executing crypto - javax.crypto.Cipher.getGsonInstance(java.lang.String,java.security.Provider) Test Case");
 			throw new ServletException(e);
 		}
-		response.getWriter().println("Crypto Test javax.crypto.Cipher.getInstance(java.lang.String,java.security.Provider) executed");
+		response.getWriter().println("Crypto Test javax.crypto.Cipher.getGsonInstance(java.lang.String,java.security.Provider) executed");
 	}
 }

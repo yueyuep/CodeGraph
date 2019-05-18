@@ -17,15 +17,15 @@ import java.util.Map;
 
 public class CSARD {
     public static void main(String[] args) {
-        getSARDGraphs("cf", "cfg");
-//        getSARDGraphs("CWE-399-SARD", "CWE-399-SARDG");
+//        getSARDGraphs("cf", "cfg");
+        getSARDGraphs("CWE-119", "CWE-119G");
     }
 
     private static void getSARDGraphs(String sourceDir, String graphDir) {
-        String source = "../CodeGraph/" + sourceDir + "/";
-        String des = "../CodeGraph/" + graphDir + "/";
-//        String source = "../benchmark/" + sourceDir + "/";
-//        String des = "../benchmark/" + graphDir + "/";
+//        String source = "../CodeGraph/" + sourceDir + "/";
+//        String des = "../CodeGraph/" + graphDir + "/";
+        String source = "../benchmark/" + sourceDir + "/";
+        String des = "../benchmark/" + graphDir + "/";
         String desT = des + "trueg/";
         String desF = des + "falseg/";
         mkdirIfNotExists(des);
@@ -34,16 +34,16 @@ public class CSARD {
         for (File subDir : new File(source).listFiles()) {
             File[] cweFiles = subDir.listFiles();
             if (cweFiles.length == 1) {
-                continue;
-/*
+//                continue;
                 File cwe = cweFiles[0];
                 if (cwe.getName().startsWith("CWE")) {
                     genSaveSardSingelGraph(cwe.getPath(), cwe.getName(), desT, desF);
                 }
-*/
             }
             if (cweFiles.length > 1) {
-                genSaveSardMultiGraph(cweFiles, desT, desF);
+                if (cweFiles[0].getName().startsWith("CWE")) {
+                    genSaveSardMultiGraph(cweFiles, desT, desF);
+                }
             }
         }
     }
@@ -83,7 +83,7 @@ public class CSARD {
                 }
                 aBC = fileGraphMap.get(aFile);
                 trueG = getGraphCrossMultiFile(aBC, dec, fileGraphMap, desDirT, aFile, trueG);
-                System.out.println(trueG);
+//                System.out.println(trueG);
             }
             if (funcName.endsWith("good")) {
                 for (CPPASTFunctionCallExpression fc : aBC.findAll(dec, CPPASTFunctionCallExpression.class)) {
@@ -97,7 +97,7 @@ public class CSARD {
                             }
                             aBC = fileGraphMap.get(aFile);
                             falseG = getGraphCrossMultiFile(aBC, calledFuncDef, fileGraphMap, desDirF, aFile, falseG);
-                            System.out.println(falseG);
+//                            System.out.println(falseG);
                         }
                     }
                 }
@@ -105,7 +105,6 @@ public class CSARD {
         }
     }
 
-    // TODO：不知为何加入了无连接的bad::action()声明
     public static int getGraphCrossMultiFile(BuildGraphC aBC, IASTFunctionDefinition funcDef,
                                              Map<File, BuildGraphC> fileGraphMap, String desDir, File aFile, int graphNum) {
         aBC.initNetwork();

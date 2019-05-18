@@ -11,6 +11,16 @@ public class Util {
     private Util() {
     }
 
+    private static class GsonHolder {
+        private static final Gson INSTANCE = new GsonBuilder().disableHtmlEscaping()
+                .excludeFieldsWithoutExposeAnnotation()
+                .create();
+    }
+
+    public static Gson getGsonInstance() {
+        return GsonHolder.INSTANCE;
+    }
+
     public static String getClassLastName(String classPackage) {
         String[] classPackageSplit = classPackage.split("\\.");
         return classPackageSplit[classPackageSplit.length - 1];
@@ -23,9 +33,7 @@ public class Util {
     }
 
     public static void saveToJsonFile(Object object, String fileName) {
-        Gson gson = new GsonBuilder().disableHtmlEscaping()
-                .excludeFieldsWithoutExposeAnnotation()
-                .create();
+        Gson gson = getGsonInstance();
         String jsonString = gson.toJson(object);
         saveToFile(jsonString, fileName);
     }
