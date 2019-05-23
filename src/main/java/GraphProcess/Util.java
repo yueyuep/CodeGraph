@@ -11,6 +11,24 @@ public class Util {
     private Util() {
     }
 
+    public static byte[] readFileToByte(String path) throws IOException {
+        File file = new File(path);
+        InputStream in = new FileInputStream(file);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int bytesRead = 0;
+        byte[] buffer = new byte[1024];
+        while ((bytesRead = in.read(buffer)) > 0) {
+            out.write(buffer, 0, bytesRead);
+        }
+        out.close();
+        in.close();
+        return out.toByteArray();
+    }
+
+    public static String readFileToString(String path) throws IOException {
+        return new String(readFileToByte(path));
+    }
+
     private static class GsonHolder {
         private static final Gson INSTANCE = new GsonBuilder().disableHtmlEscaping()
                 .excludeFieldsWithoutExposeAnnotation()

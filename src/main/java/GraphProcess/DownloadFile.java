@@ -68,7 +68,7 @@ public class DownloadFile{
                 urlPrefix = WICKET;
                 saveDir = "bug/wicket/";
             }
-            String versions = ParsePatch.readFileToString(arch).trim();
+            String versions = Util.readFileToString(arch).trim();
             String[] lines = versions.split("\n");
             for (String line : lines) {
                 line = line.trim().split("/")[2];

@@ -1370,11 +1370,11 @@ public class AST2Graph extends ParseUtil implements Graph {
         });
     }
 
-    public boolean isContain(String master, String sub) {
+    public static boolean isContain(String master, String sub) {
         return master.contains(sub);
     }
 
-    public boolean isContain(String master, String[] sub) {
+    public static boolean isContain(String master, String[] sub) {
         for (String s : sub) {
             if (isContain(master, s)) {
                 return true;

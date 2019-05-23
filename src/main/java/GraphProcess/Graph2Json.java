@@ -14,6 +14,7 @@ import com.github.javaparser.ast.type.*;
 import com.google.common.graph.MutableNetwork;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
+import org.eclipse.cdt.core.dom.ast.IASTName;
 import org.eclipse.cdt.core.dom.ast.IASTNode;
 import owaspbench.VecGenerator;
 
@@ -80,7 +81,11 @@ public class Graph2Json {
                 cls = cls.replace("CPPAST", "");
             }
 //            mFeatures.add(SplitString.splitUntilUpperCase(Util.getClassLastName(node)));
-            mFeatures.add(SplitString.splitUntilUpperCase(cls));
+            if (node instanceof IASTName) {
+                mFeatures.add(SplitString.splitUntilUpperCase(cls) + " " + node.toString());
+            } else {
+                mFeatures.add(SplitString.splitUntilUpperCase(cls));
+            }
 //            mFeatures.add(travelNode(((RangeNode) node).getNode()));
         } else if (node instanceof StringCapsule) {
             mFeatures.add(((StringCapsule) node).getString());

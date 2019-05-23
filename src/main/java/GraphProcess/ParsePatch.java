@@ -62,26 +62,8 @@ public class ParsePatch {
         mContent = content;
     }
 
-    public static byte[] readFileToByte(String path) throws IOException {
-        File file = new File(path);
-        InputStream in = new FileInputStream(file);
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        int bytesRead = 0;
-        byte[] buffer = new byte[1024];
-        while ((bytesRead = in.read(buffer)) > 0) {
-            out.write(buffer, 0, bytesRead);
-        }
-        out.close();
-        in.close();
-        return out.toByteArray();
-    }
-
-    public static String readFileToString(String path) throws IOException {
-        return new String(readFileToByte(path));
-    }
-
     public static ArrayList<ChangedFilePair> getChangedFilePairsFromDiff(String patchPath) throws IOException {
-        String patchContent = ParsePatch.readFileToString(patchPath);
+        String patchContent = Util.readFileToString(patchPath);
         ArrayList<ChangedFilePair> changedFilePairs = new ArrayList<>();
         String[] lines = patchContent.split("\n");
         ParsePatch parsePatch = ParsePatch.getInstance();

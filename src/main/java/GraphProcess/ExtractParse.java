@@ -50,7 +50,7 @@ public class ExtractParse {
     }
 
     public static void saveCorpusFromTo(String origin, String another) throws IOException {
-        String json = ParsePatch.readFileToString(origin);
+        String json = Util.readFileToString(origin);
         json = json.replaceAll(sSymbolRegex, " $1 ");
 
         FileWriter toOldFileWriter = new FileWriter(new File(another));
@@ -60,7 +60,7 @@ public class ExtractParse {
 
     public void splitOldNew(String jsonPath) throws IOException {
         Gson gson = new Gson();
-        String json = ParsePatch.readFileToString(jsonPath);
+        String json = Util.readFileToString(jsonPath);
         ArrayList<ChangedFilePair> allChangedFilePairs = gson.fromJson(json, new TypeToken<ArrayList<ChangedFilePair>>(){}.getType());
         StringBuilder oldResult = new StringBuilder();
         StringBuilder newResult = new StringBuilder();

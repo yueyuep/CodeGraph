@@ -1,6 +1,5 @@
 package CProcess;
 
-import CCPP.metadata.TClass;
 import GraphProcess.Graph;
 import GraphProcess.Util;
 import com.google.common.graph.MutableNetwork;
@@ -9,9 +8,9 @@ import org.eclipse.cdt.core.dom.ast.*;
 import org.eclipse.cdt.core.dom.ast.cpp.*;
 import org.eclipse.cdt.internal.core.dom.parser.cpp.*;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+
+import static GraphProcess.Util.isContain;
 
 
 public class BuildGraphC extends CParseUtil implements Graph {
@@ -26,11 +25,15 @@ public class BuildGraphC extends CParseUtil implements Graph {
     public int mEdgeNumber;
     public MutableNetwork<Object, String> mNetwork;
 //    public MutableNetwork<Object, String> mCFGNetwork;
-    public boolean mAll = true;
+    public boolean mAll = false;
+//    public boolean mAll = true;
     public IASTFunctionDefinition mFunctionDefinition;
     public IASTName mLastUse;
     public IASTName mLastWrite;
-    private List<IASTFunctionDefinition> mCalledMethodDecls = new ArrayList<>();
+    public List<IASTFunctionDefinition> mCalledMethodDecls = new ArrayList<>();
+    public Set<CPPASTName> mRelatedNames = new HashSet<>();
+    public String[] mDFGEdgeTypes = new String[]{EDGE_LAST_USE, EDGE_LAST_WRITE, EDGE_COMPUTED_FROM,
+            EDGE_LAST_LEXICAL_USE, EDGE_GUARDED_BY, EDGE_GUARDED_BY_NEGATION};
 
 
     private BuildGraphC(String srcFilePath) {
@@ -73,10 +76,13 @@ public class BuildGraphC extends CParseUtil implements Graph {
         }
         IASTFunctionDefinition called = mCalledMethodDecls.remove(0);
         if (!mVisitedNodes.contains(called)) {
+            boolean beforeAll = mAll;
+            mAll = true;
             initCFG();
             visitNode(called);
             buildCFG(called);
             buildDFG(called);
+            mAll = beforeAll;
         }
         travelCalled();
     }
@@ -712,6 +718,9 @@ public class BuildGraphC extends CParseUtil implements Graph {
             }
             if (node instanceof CPPASTName) {
                 CPPASTName n = (CPPASTName) node;
+                if (mRelatedNames.contains(n)) {
+                    return true;
+                }
                 return mAll;
             }
             {
@@ -956,7 +965,12 @@ public class BuildGraphC extends CParseUtil implements Graph {
                 }
                 return add || mAll;
             }
-            if (node instanceof IASTName) {
+//            if (node instanceof IASTName) {
+            if (node instanceof CPPASTName) {
+                CPPASTName n = (CPPASTName) node;
+                if (mRelatedNames.contains(n)) {
+                    return true;
+                }
                 return add || mAll;
             }
             {
@@ -1173,7 +1187,10 @@ public class BuildGraphC extends CParseUtil implements Graph {
     }
 
     public void addNextExecEdge(IASTNode pre, IASTNode succ) {
-        putEdge(pre, succ, EDGE_NEXT_EXEC);
+        if (mNetwork.nodes().contains(pre) && mNetwork.nodes().contains(succ)) {
+            putEdge(pre, succ, EDGE_NEXT_EXEC);
+        }
+//        putEdge(pre, succ, EDGE_NEXT_EXEC);
     }
 
     public void addLastWriteList(List<IASTName> nowNodes, IASTName lastWrite) {
@@ -1289,11 +1306,57 @@ public class BuildGraphC extends CParseUtil implements Graph {
         if (nodeU == null || nodeV == null) {
             return;
         }
+        if (!mAll && isContain(edgeType, mDFGEdgeTypes) &&
+                !(mNetwork.nodes().contains(nodeU) && mNetwork.nodes().contains(nodeV))) {
+            return;
+        }
         mNetwork.addEdge(nodeU, nodeV, edgeType + "_" + mEdgeNumber);
 //        if (edgeType.contains(EDGE_NEXT_EXEC)) {
 //            mCFGNetwork.addEdge(nodeU, nodeV, edgeType + "_" + mEdgeNumber);
 //        }
         mEdgeNumber = mEdgeNumber + 1;
+    }
+
+    public Set<CPPASTName> getDFGRelateNodes(CPPASTName name, Set<CPPASTName> relatedNodes) {
+        relatedNodes.add(name);
+        for (Object object : mNetwork.nodes()) {
+            if (object instanceof CPPASTName && !relatedNodes.contains(object) &&
+                    isDFGEdgeConnect(name, (CPPASTName) object)) {
+                relatedNodes.addAll(getDFGRelateNodes((CPPASTName) object, relatedNodes));
+            }
+        }
+        return relatedNodes;
+    }
+
+    public Set<CPPASTName> getSinkRelate(int line) {
+        Set<CPPASTName> relatedNodes = new HashSet<>();
+        for (Object object : mNetwork.nodes()) {
+            if (object instanceof CPPASTName) {
+                CPPASTName name = (CPPASTName) object;
+                if (name.getFileLocation().getStartingLineNumber() == line) {
+                    relatedNodes.addAll(getDFGRelateNodes(name, relatedNodes));
+                }
+            }
+        }
+        return relatedNodes;
+    }
+
+    public boolean isDFGEdgeConnect(CPPASTName pre, CPPASTName succ) {
+        return (mNetwork.hasEdgeConnecting(pre, succ) &&
+                hasConnectingBelongs(pre, succ, new String[]{EDGE_COMPUTED_FROM, EDGE_LAST_USE,
+                        EDGE_LAST_WRITE, EDGE_LAST_LEXICAL_USE, EDGE_FORMAL_ARG_NAME})) ||
+                (mNetwork.hasEdgeConnecting(pre, succ)
+                        && hasConnectingBelongs(succ, pre, new String[]{EDGE_LAST_USE, //  TODO: EDGE_FORMAL_ARG_NAME 可以看到var所在的方法体被谁调用
+                        EDGE_LAST_WRITE, EDGE_LAST_LEXICAL_USE}));
+    }
+
+    public boolean hasConnectingBelongs(Object nodeU, Object nodeV, String[] edgeTypes) {
+        for (String edgeType : mNetwork.edgesConnecting(nodeU, nodeV)) {
+            if (isContain(edgeType, edgeTypes)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public MutableNetwork<Object, String> getNetwork() {
@@ -1310,5 +1373,21 @@ public class BuildGraphC extends CParseUtil implements Graph {
 
     public void setEdgeNumber(int edgeNumber) {
         mEdgeNumber = edgeNumber;
+    }
+
+    public boolean isAll() {
+        return mAll;
+    }
+
+    public void setAll(boolean all) {
+        mAll = all;
+    }
+
+    public Set<CPPASTName> getRelatedNames() {
+        return mRelatedNames;
+    }
+
+    public void setRelatedNames(Set<CPPASTName> relatedNames) {
+        mRelatedNames = relatedNames;
     }
 }
