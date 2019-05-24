@@ -1,6 +1,10 @@
 package CProcess;
 
 public class CAPIFunctionName {
+    public static final String CWE_119_FUNCTIONS = "cwe_119_functions";
+    public static final String CWE_399_FUNCTIONS = "cwe_399_functions";
+    public static String funcType;
+
     public static String[] mCWE119Funcs = new String[]{
             "cin", "getenv", "getenv_s", "wgetenv", "_wgetenv_s", "catgets", "gets", "getchar", "getc", "getch",
             "getche", "kbhit", "stdin", "getdlgtext", "getpass", "scanf", "fscanf", "vscanf", "vfscanf",
@@ -29,12 +33,26 @@ public class CAPIFunctionName {
             "vasprintf", "sprintf", "snprintf", "_snprintf", "_snwprintf", "vsnprint"
     };
 
+    public static boolean isAPIFunc(String funcName) {
+        if (funcType.equals(CWE_119_FUNCTIONS)) {
+            return isCWE119Func(funcName);
+        } else if (funcType.equals(CWE_399_FUNCTIONS)) {
+            return isCWE399Func(funcName);
+        } else {
+            throw new NullPointerException(funcName);
+        }
+    }
     public static boolean isCWE119Func(String funcName) {
         return isFuncNameIn(funcName, mCWE119Funcs);
     }
 
     public static boolean isCWE399Func(String funcName) {
-        return isFuncNameIn(funcName, mCWE399Funcs);
+        for (String name : mCWE399Funcs) {
+            if (name.equals(funcName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean isFuncNameIn(String funcName, String[] funcs) {
@@ -45,4 +63,21 @@ public class CAPIFunctionName {
         }
         return false;
     }
+
+    public static String getFuncType() {
+        return funcType;
+    }
+
+    public static void setFuncType(String funcType) {
+        CAPIFunctionName.funcType = funcType;
+    }
+
+    public static void setFuncTypeCWE119() {
+        setFuncType(CWE_119_FUNCTIONS);
+    }
+
+    public static void setFuncTypeCWE399() {
+        setFuncType(CWE_399_FUNCTIONS);
+    }
+
 }

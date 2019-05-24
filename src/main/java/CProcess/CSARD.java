@@ -1,15 +1,13 @@
 package CProcess;
 
 import GraphProcess.Graph2Json;
+import GraphProcess.Util;
 import com.google.common.graph.MutableNetwork;
-import org.eclipse.cdt.core.dom.ast.IASTCompoundStatement;
 import org.eclipse.cdt.core.dom.ast.IASTFunctionDefinition;
 import org.eclipse.cdt.core.dom.ast.IASTName;
-import org.eclipse.cdt.core.dom.ast.IASTNode;
 import org.eclipse.cdt.internal.core.dom.parser.cpp.*;
 
 import java.io.File;
-import java.lang.reflect.MalformedParameterizedTypeException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,9 +26,9 @@ public class CSARD {
         String des = "../benchmark/" + graphDir + "/";
         String desT = des + "trueg/";
         String desF = des + "falseg/";
-        mkdirIfNotExists(des);
-        mkdirIfNotExists(desT);
-        mkdirIfNotExists(desF);
+        Util.mkdirIfNotExists(des);
+        Util.mkdirIfNotExists(desT);
+        Util.mkdirIfNotExists(desF);
         for (File subDir : new File(source).listFiles()) {
             File[] cweFiles = subDir.listFiles();
             if (cweFiles.length == 1) {
@@ -246,10 +244,4 @@ public class CSARD {
         return graphNum;
     }
 
-    public static void mkdirIfNotExists(String dirPath) {
-        File dir = new File(dirPath);
-        if (!dir.exists()) {
-            dir.mkdir();
-        }
-    }
 }

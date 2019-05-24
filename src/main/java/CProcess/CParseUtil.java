@@ -63,6 +63,16 @@ public class CParseUtil {
         }
     }
 
+    public CPPASTFunctionDefinition findFuncDefinition(int line) {
+        for (IASTFunctionDefinition func : mFunctionDefinitions) {
+            if (func.getFileLocation().getStartingLineNumber() <= line &&
+                    func.getFileLocation().getEndingLineNumber() >= line) {
+                return (CPPASTFunctionDefinition) func;
+            }
+        }
+        return null;
+    }
+
     public <T extends IASTNode> void collectVariableNames(T node) {
         for (IASTNode child : node.getChildren()) {
             if (child instanceof CPPASTFunctionDeclarator) {

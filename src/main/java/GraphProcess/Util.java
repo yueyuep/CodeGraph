@@ -127,4 +127,15 @@ public class Util {
         return false;
     }
 
+    public static String getFileNameOfFilePath(String filePath) {
+        String[] paths = filePath.split("/");
+        return paths[paths.length - 1];
+    }
+
+    public static void mkdirIfNotExists(String dirPath) {
+        File dir = new File(dirPath);
+        if (!dir.exists()) {
+            dir.mkdir();
+        }
+    }
 }
