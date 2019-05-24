@@ -18,12 +18,14 @@ public class CNVD {
     public static void main(String[] args) throws IOException {
         String sourceFileDir = "../VulDeePecker-master/CWE-399/source_files/";
         String cgdFile = "cgd/VulDeeNVD399.txt";
-        String saveDir = "../benchmark/nvd399/";
+        String saveDir = "../benchmark/nvd399-real/";
+        CAPIFunctionName.setFuncTypeCWE399();
         getNVDGraphs(sourceFileDir, cgdFile, saveDir);
 
         sourceFileDir = "../VulDeePecker-master/CWE-119/source_files/";
         cgdFile = "cgd/VulDeeNVD119.txt";
-        saveDir = "../benchmark/nvd119/";
+        saveDir = "../benchmark/nvd119-real/";
+        CAPIFunctionName.setFuncTypeCWE119();
         getNVDGraphs(sourceFileDir, cgdFile, saveDir);
     }
 
@@ -31,8 +33,6 @@ public class CNVD {
         Util.mkdirIfNotExists(saveDir);
         Util.mkdirIfNotExists(saveDir + "trueg/");
         Util.mkdirIfNotExists(saveDir + "falseg/");
-
-        CAPIFunctionName.setFuncTypeCWE119();
         Gson gson = new Gson();
         String json = Util.readFileToString(cgdFile);
         ArrayList<CGD> cgds = gson.fromJson(json, new TypeToken<ArrayList<CGD>>(){}.getType());
